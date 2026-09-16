@@ -1,0 +1,9 @@
+{
+  "title": "Prueba",
+  "url": "https://ejemplo.com",
+  "content": "Contenido de prueba con ñ y áéíóú",
+  "links": [
+    "https://ejemplo.com/1",
+    "https://ejemplo.com/2"
+  ]
+}

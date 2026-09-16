@@ -39,6 +39,47 @@ def extraer_titulo(soup: BeautifulSoup) -> str:
         return ""
     return tag_titulo.get_text(strip=True)
 
+def extraer_enlaces(soup: BeautifulSoup, url_base: str) -> list[str]:
+    """
+    Extrae todos los enlaces (<a href="...">) de la página,
+    los convierte en URLs absolutas y descarta enlaces no útiles.
+    Devuelve una lista de URLs únicas.
+    """
+    enlaces_validos = set()
+
+    for tag_a in soup.find_all("a"):
+        href = tag_a.get("href")
+
+        if not href:
+            continue  # no tiene atributo href
+
+        href = href.strip()
+
+        if href.startswith("#") or href.startswith("javascript:") or href.startswith("mailto:"):
+            continue  # enlace no navegable / no útil
+
+        url_absoluta = urljoin(url_base, href)
+        enlaces_validos.add(url_absoluta)
+
+    return sorted(enlaces_validos)
+
+def extraer_contenido(soup: BeautifulSoup) -> str:
+    """
+    Extrae el texto visible del cuerpo de la página,
+    eliminando scripts, estilos y espacios/saltos de línea redundantes.
+    """
+    # Eliminamos etiquetas que no son texto "legible" para un humano
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
+    texto = soup.get_text(separator=" ")
+
+    # Normalizamos espacios: varias líneas/espacios seguidos -> uno solo
+    lineas = [linea.strip() for linea in texto.splitlines()]
+    lineas_no_vacias = [linea for linea in lineas if linea]
+    texto_limpio = " ".join(lineas_no_vacias)
+
+    return texto_limpio
 
 if __name__ == "__main__":
     from darkintel.scraper.fetcher import obtener_html
@@ -49,9 +90,12 @@ if __name__ == "__main__":
 
     titulo_pagina = extraer_titulo(soup)
     libros = extraer_libros(soup, url)
+    enlaces = extraer_enlaces(soup, url)
 
     print("Título de la página:", titulo_pagina)
     print(f"Se encontraron {len(libros)} libros.")
-    print("Primeros 3 libros:")
-    for libro in libros[:3]:
-        print(libro)
+    print(f"Se encontraron {len(enlaces)} enlaces únicos.")
+    print("Primeros 5 enlaces:")
+    for enlace in enlaces[:5]:
+        print(" -", enlace)
+
