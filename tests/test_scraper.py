@@ -4,7 +4,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from darkintel.scraper.scraper import scrapear_pagina
-
+import json
 
 def test_scrapear_pagina_estructura_correcta():
     resultado = scrapear_pagina("https://books.toscrape.com")
@@ -58,7 +58,46 @@ def test_deteccion_iocs_con_texto_simulado():
     print("✅ Prueba superada: detección de IoCs confirmada con datos simulados.")
 
 
+def test_scrapear_pagina_incluye_stix_bundle():
+    resultado = scrapear_pagina("https://books.toscrape.com")
+
+    assert "stix_bundle" in resultado
+    assert resultado["stix_bundle"]["type"] == "bundle"
+
+    # "objects" es OPCIONAL en STIX 2.1: si no hay indicadores,
+    # la librería omite esta clave en vez de dejarla como lista vacía.
+    # Por eso usamos .get() con default [] en lugar de asumir que existe.
+    objetos = resultado["stix_bundle"].get("objects", [])
+    assert isinstance(objetos, list)
+
+    print("✅ Prueba superada: el resultado incluye un Bundle STIX válido.")
+    print(f"   Cantidad de objetos en el bundle: {len(objetos)}")
+
+from darkintel.stix_builder.builder import construir_bundle
+
+def test_bundle_incluye_objects_cuando_hay_iocs():
+    iocs_con_datos = {
+        "ips": ["8.8.8.8"],
+        "dominios": [],
+        "emails": [],
+        "cves": [],
+        "md5": [],
+        "sha1": [],
+        "sha256": [],
+    }
+
+    bundle = construir_bundle(iocs_con_datos)
+    bundle_dict = json.loads(str(bundle))
+
+    assert "objects" in bundle_dict
+    assert len(bundle_dict["objects"]) == 1
+
+    print("✅ Prueba superada: 'objects' aparece correctamente cuando hay IoCs.")
+
+
 if __name__ == "__main__":
     test_scrapear_pagina_estructura_correcta()
     test_scrapear_pagina_incluye_iocs()
     test_deteccion_iocs_con_texto_simulado()
+    test_scrapear_pagina_incluye_stix_bundle()
+    test_bundle_incluye_objects_cuando_hay_iocs()

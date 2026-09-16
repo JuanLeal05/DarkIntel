@@ -7,24 +7,23 @@ from darkintel.scraper.parser import (
 )
 from darkintel.scraper.storage import guardar_json
 from darkintel.ioc_detector.detector import detectar_iocs
-
-
+from darkintel.stix_builder.builder import construir_bundle
+import json
 def scrapear_pagina(url: str) -> dict:
-    """
-    Orquesta el proceso completo: descarga, parseo,
-    extracción de datos estructurados y detección de IoCs.
-    """
     html = obtener_html(url)
     soup = crear_soup(html)
 
     contenido = extraer_contenido(soup)
+    iocs = detectar_iocs(contenido)
+    bundle = construir_bundle(iocs)
 
     resultado = {
         "title": extraer_titulo(soup),
         "url": url,
         "content": contenido,
         "links": extraer_enlaces(soup, url),
-        "iocs": detectar_iocs(contenido),
+        "iocs": iocs,
+        "stix_bundle": json.loads(str(bundle)),
     }
 
     return resultado
