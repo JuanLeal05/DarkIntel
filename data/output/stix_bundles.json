@@ -1,0 +1,316 @@
+{
+  "cluster_0": {
+    "type": "bundle",
+    "id": "bundle--dd14ee7f-d08b-4d83-86b3-a888b00161e0",
+    "objects": [
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--7200e39b-c41f-4874-a4b7-6e7c5d438939",
+        "created": "2026-09-16T03:33:49.578665Z",
+        "modified": "2026-09-16T03:33:49.578665Z",
+        "name": "Dominio sospechoso: darkpay.onion",
+        "pattern": "[domain-name:value = 'darkpay.onion']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--cb93f16b-ec4c-41fd-be02-995f439f345b",
+        "created": "2026-09-16T03:33:49.584858Z",
+        "modified": "2026-09-16T03:33:49.584858Z",
+        "name": "Dominio sospechoso: ransom.darkpay.onion",
+        "pattern": "[domain-name:value = 'ransom.darkpay.onion']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--2386af5b-5fc0-4aae-a652-eb1d202f2dcf",
+        "created": "2026-09-16T03:33:49.585651Z",
+        "modified": "2026-09-16T03:33:49.585651Z",
+        "name": "Archivo sospechoso (SHA-256): a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+        "pattern": "[file:hashes.'SHA-256' = 'a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--ea327afd-d7c9-45ad-b863-5b935ee4c384",
+        "created": "2026-09-16T03:33:49.588662Z",
+        "modified": "2026-09-16T03:33:49.588662Z",
+        "name": "Archivo sospechoso (SHA-256): b14a7b8059d9c055954c92674ce60032b0a52f8e000000000000000000000000",
+        "pattern": "[file:hashes.'SHA-256' = 'b14a7b8059d9c055954c92674ce60032b0a52f8e000000000000000000000000']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--8909a94b-7349-4df9-a454-43aff70d6449",
+        "created": "2026-09-16T03:33:49.589676Z",
+        "modified": "2026-09-16T03:33:49.589676Z",
+        "name": "Archivo sospechoso (MD5): 098f6bcd4621d373cade4e832627b4f6",
+        "pattern": "[file:hashes.'MD5' = '098f6bcd4621d373cade4e832627b4f6']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "campaign",
+        "spec_version": "2.1",
+        "id": "campaign--d240ee35-a61e-43d7-9b3f-5a4aa8a56f79",
+        "created": "2026-09-16T03:33:49.590522Z",
+        "modified": "2026-09-16T03:33:49.590522Z",
+        "name": "Campaña cluster-0",
+        "description": "IoCs: a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a, b14a7b8059d9c055954c92674ce60032b0a52f8e000000000000000000000000, 098f6bcd4621d373cade4e832627b4f6, darkpay.onion, ransom.darkpay.onion"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--024f56f5-4569-4e21-9d1f-a42d7ad4f0a4",
+        "created": "2026-09-16T03:33:49.590702Z",
+        "modified": "2026-09-16T03:33:49.590702Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--7200e39b-c41f-4874-a4b7-6e7c5d438939",
+        "target_ref": "campaign--d240ee35-a61e-43d7-9b3f-5a4aa8a56f79"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--9081ce16-c89e-43c8-88b8-85fd9dcee57d",
+        "created": "2026-09-16T03:33:49.591328Z",
+        "modified": "2026-09-16T03:33:49.591328Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--cb93f16b-ec4c-41fd-be02-995f439f345b",
+        "target_ref": "campaign--d240ee35-a61e-43d7-9b3f-5a4aa8a56f79"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--ad3710ef-4355-491d-bb9f-8161b1bf4c05",
+        "created": "2026-09-16T03:33:49.591529Z",
+        "modified": "2026-09-16T03:33:49.591529Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--2386af5b-5fc0-4aae-a652-eb1d202f2dcf",
+        "target_ref": "campaign--d240ee35-a61e-43d7-9b3f-5a4aa8a56f79"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--e4364f7f-44d9-404a-b4c1-e2f8899cd55b",
+        "created": "2026-09-16T03:33:49.591705Z",
+        "modified": "2026-09-16T03:33:49.591705Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--ea327afd-d7c9-45ad-b863-5b935ee4c384",
+        "target_ref": "campaign--d240ee35-a61e-43d7-9b3f-5a4aa8a56f79"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--2381cbb8-0d25-4701-bcb0-7bdc000caac3",
+        "created": "2026-09-16T03:33:49.591866Z",
+        "modified": "2026-09-16T03:33:49.591866Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--8909a94b-7349-4df9-a454-43aff70d6449",
+        "target_ref": "campaign--d240ee35-a61e-43d7-9b3f-5a4aa8a56f79"
+      }
+    ]
+  },
+  "cluster_1": {
+    "type": "bundle",
+    "id": "bundle--844c0121-3768-4ab3-b722-6ca45e299b86",
+    "objects": [
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--5ea46e10-4ffb-4b37-8826-b1beafac508d",
+        "created": "2026-09-16T03:33:49.592799Z",
+        "modified": "2026-09-16T03:33:49.592799Z",
+        "name": "IP sospechosa: 192.0.2.100",
+        "pattern": "[ipv4-addr:value = '192.0.2.100']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--3b09e827-2613-486a-a31e-00e2cbde9b93",
+        "created": "2026-09-16T03:33:49.593757Z",
+        "modified": "2026-09-16T03:33:49.593757Z",
+        "name": "IP sospechosa: 203.0.113.17",
+        "pattern": "[ipv4-addr:value = '203.0.113.17']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--3d6af267-a32d-47b1-b967-f469b94f9c63",
+        "created": "2026-09-16T03:33:49.594373Z",
+        "modified": "2026-09-16T03:33:49.594373Z",
+        "name": "IP sospechosa: 198.51.100.42",
+        "pattern": "[ipv4-addr:value = '198.51.100.42']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--1a61f489-3855-45a0-865c-6bd4350f63cf",
+        "created": "2026-09-16T03:33:49.594889Z",
+        "modified": "2026-09-16T03:33:49.594889Z",
+        "name": "Dominio sospechoso: exploit-market.onion",
+        "pattern": "[domain-name:value = 'exploit-market.onion']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--b11a83a7-3962-4695-972b-aec68c65c244",
+        "created": "2026-09-16T03:33:49.595734Z",
+        "modified": "2026-09-16T03:33:49.595734Z",
+        "name": "Archivo sospechoso (SHA-256): c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2",
+        "pattern": "[file:hashes.'SHA-256' = 'c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "indicator",
+        "spec_version": "2.1",
+        "id": "indicator--81ad5f63-fe0d-4597-9d8d-a2c6f374e5b0",
+        "created": "2026-09-16T03:33:49.596608Z",
+        "modified": "2026-09-16T03:33:49.596608Z",
+        "name": "Archivo sospechoso (MD5): 5d41402abc4b2a76b9719d911017c592",
+        "pattern": "[file:hashes.'MD5' = '5d41402abc4b2a76b9719d911017c592']",
+        "pattern_type": "stix",
+        "pattern_version": "2.1",
+        "valid_from": "2025-01-01T00:00:00Z"
+      },
+      {
+        "type": "vulnerability",
+        "spec_version": "2.1",
+        "id": "vulnerability--1a67abfc-11ec-4734-9216-7324c458f089",
+        "created": "2026-09-16T03:33:49.597418Z",
+        "modified": "2026-09-16T03:33:49.597418Z",
+        "name": "CVE-2024-1234",
+        "external_references": [
+          {
+            "source_name": "cve",
+            "external_id": "CVE-2024-1234"
+          }
+        ]
+      },
+      {
+        "type": "vulnerability",
+        "spec_version": "2.1",
+        "id": "vulnerability--929363fe-6004-4f04-b6df-c932cdfa8a23",
+        "created": "2026-09-16T03:33:49.597702Z",
+        "modified": "2026-09-16T03:33:49.597702Z",
+        "name": "CVE-2024-9999",
+        "external_references": [
+          {
+            "source_name": "cve",
+            "external_id": "CVE-2024-9999"
+          }
+        ]
+      },
+      {
+        "type": "vulnerability",
+        "spec_version": "2.1",
+        "id": "vulnerability--bf209490-1eb5-4abd-9cbe-4b9b352bffa1",
+        "created": "2026-09-16T03:33:49.597921Z",
+        "modified": "2026-09-16T03:33:49.597921Z",
+        "name": "CVE-2024-5678",
+        "external_references": [
+          {
+            "source_name": "cve",
+            "external_id": "CVE-2024-5678"
+          }
+        ]
+      },
+      {
+        "type": "campaign",
+        "spec_version": "2.1",
+        "id": "campaign--e3abc08d-53b8-4915-9398-51b543be1979",
+        "created": "2026-09-16T03:33:49.598146Z",
+        "modified": "2026-09-16T03:33:49.598146Z",
+        "name": "Campaña cluster-1",
+        "description": "IoCs: 192.0.2.100, 203.0.113.17, 198.51.100.42, c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2, 5d41402abc4b2a76b9719d911017c592, CVE-2024-1234, CVE-2024-9999, CVE-2024-5678, exploit-market.onion"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--e51bf1a0-1935-4110-b232-2030db425827",
+        "created": "2026-09-16T03:33:49.598327Z",
+        "modified": "2026-09-16T03:33:49.598327Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--5ea46e10-4ffb-4b37-8826-b1beafac508d",
+        "target_ref": "campaign--e3abc08d-53b8-4915-9398-51b543be1979"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--9617d1b8-e775-4fc7-b739-9bb8bc7caa1b",
+        "created": "2026-09-16T03:33:49.599116Z",
+        "modified": "2026-09-16T03:33:49.599116Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--3b09e827-2613-486a-a31e-00e2cbde9b93",
+        "target_ref": "campaign--e3abc08d-53b8-4915-9398-51b543be1979"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--b7713ad3-ba10-455d-af15-90247dde9e93",
+        "created": "2026-09-16T03:33:49.599313Z",
+        "modified": "2026-09-16T03:33:49.599313Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--3d6af267-a32d-47b1-b967-f469b94f9c63",
+        "target_ref": "campaign--e3abc08d-53b8-4915-9398-51b543be1979"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--79ce9b2b-4b65-4176-b343-f6f37c4d5723",
+        "created": "2026-09-16T03:33:49.599494Z",
+        "modified": "2026-09-16T03:33:49.599494Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--1a61f489-3855-45a0-865c-6bd4350f63cf",
+        "target_ref": "campaign--e3abc08d-53b8-4915-9398-51b543be1979"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--3ba875c4-190a-49bc-8083-1a5c272f3d2e",
+        "created": "2026-09-16T03:33:49.599678Z",
+        "modified": "2026-09-16T03:33:49.599678Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--b11a83a7-3962-4695-972b-aec68c65c244",
+        "target_ref": "campaign--e3abc08d-53b8-4915-9398-51b543be1979"
+      },
+      {
+        "type": "relationship",
+        "spec_version": "2.1",
+        "id": "relationship--a8016083-4548-43d6-afef-382d5218f32d",
+        "created": "2026-09-16T03:33:49.599856Z",
+        "modified": "2026-09-16T03:33:49.599856Z",
+        "relationship_type": "indicates",
+        "source_ref": "indicator--81ad5f63-fe0d-4597-9d8d-a2c6f374e5b0",
+        "target_ref": "campaign--e3abc08d-53b8-4915-9398-51b543be1979"
+      }
+    ]
+  }
+}

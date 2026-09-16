@@ -2,33 +2,22 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 
-def extraer_libros(soup: BeautifulSoup, url_base: str) -> list[dict]:
+def extraer_texto_pagina(soup: BeautifulSoup) -> str:
     """
-    Extrae título y enlace absoluto de cada libro listado en la página.
-    Devuelve una lista de diccionarios: [{"titulo": ..., "url": ...}, ...]
+    Extrae el texto visible de una página eliminando scripts y estilos.
+    Esta es la entrada que consumirá el módulo NER.
     """
-    libros = []
-    articulos = soup.find_all("article", class_="product_pod")
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+    return soup.get_text(separator=" ", strip=True)
 
-    for articulo in articulos:
-        tag_enlace = articulo.find("h3").find("a")
-
-        titulo = tag_enlace.get("title", "").strip()
-        href_relativo = tag_enlace.get("href", "")
-        url_absoluta = urljoin(url_base, href_relativo)
-
-        libros.append({
-            "titulo": titulo,
-            "url": url_absoluta
-        })
-
-    return libros
 
 def crear_soup(html: str) -> BeautifulSoup:
     """
     Convierte un string de HTML en un objeto BeautifulSoup navegable.
     """
     return BeautifulSoup(html, "lxml")
+
 
 def extraer_titulo(soup: BeautifulSoup) -> str:
     """
@@ -47,11 +36,6 @@ if __name__ == "__main__":
     html = obtener_html(url)
     soup = crear_soup(html)
 
-    titulo_pagina = extraer_titulo(soup)
-    libros = extraer_libros(soup, url)
-
-    print("Título de la página:", titulo_pagina)
-    print(f"Se encontraron {len(libros)} libros.")
-    print("Primeros 3 libros:")
-    for libro in libros[:3]:
-        print(libro)
+    print("Título:", extraer_titulo(soup))
+    print("Texto extraído (primeros 300 chars):")
+    print(extraer_texto_pagina(soup)[:300])
