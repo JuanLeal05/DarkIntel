@@ -1,0 +1,18 @@
+# DarkIntel — proxy Tor (red: darknet)
+#
+# PLACEHOLDER FUNCIONAL: el daemon Tor corre y expone SOCKS5 en :9050 dentro
+# de la red darknet, pero el codigo del scraper todavia NO lo usa
+# (fetcher.py sigue haciendo requests.get() plano). Ver README-docker.md.
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tor curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/torrc /etc/tor/torrc
+
+# El puerto SOCKS NO se publica al host: solo es alcanzable desde la red darknet.
+EXPOSE 9050
+
+USER debian-tor
+CMD ["tor", "-f", "/etc/tor/torrc"]

@@ -1,0 +1,26 @@
+# Configuracion minima del proxy Tor para DarkIntel.
+
+# Escucha en todas las interfaces del contenedor para que `scraper` pueda
+# alcanzarlo como socks5h://tor-proxy:9050. El puerto no se publica al host,
+# asi que solo es accesible desde la red darknet.
+SocksPort 0.0.0.0:9050
+
+# Solo se aceptan conexiones desde loopback (healthcheck dentro del propio
+# contenedor) y desde rangos privados de Docker (red darknet).
+SocksPolicy accept 127.0.0.1/8
+SocksPolicy accept 10.0.0.0/8
+SocksPolicy accept 172.16.0.0/12
+SocksPolicy accept 192.168.0.0/16
+SocksPolicy reject *
+
+DataDirectory /var/lib/tor
+Log notice stdout
+
+# Rotacion de circuitos: tiempo de vida de un circuito antes de rotar.
+MaxCircuitDirtiness 60
+
+# ControlPort — necesario para la rotacion programatica de circuitos con Stem
+# (Python). Se deja comentado hasta que se implemente esa parte: abrirlo sin
+# autenticacion configurada seria un riesgo innecesario.
+# ControlPort 0.0.0.0:9051
+# HashedControlPassword <generar con: tor --hash-password "<password>">

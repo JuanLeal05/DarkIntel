@@ -1,0 +1,129 @@
+# DarkIntel — orquestacion con aislamiento de red en tres zonas.
+#
+#   darknet   (riesgo)      : tor-proxy + scraper. Salida a internet, SIN ruta
+#                             hacia backend y sin credenciales de base de datos.
+#   backend   (procesamiento): processor + db. internal=true, sin salida a
+#                             internet. Nunca escribe hacia darknet.
+#   frontend  (exposicion)   : api. Unico servicio con puerto publicado.
+#
+# El volumen raw_data es el UNICO punto de contacto entre darknet y backend:
+# el scraper lo escribe, el processor lo lee en solo-lectura. Si el contenedor
+# del scraper se ve comprometido por contenido .onion, no tiene ruta de red
+# hacia la base de datos.
+
+name: darkintel
+
+networks:
+  darknet:
+    name: darkintel_darknet
+    # NO es internal: tor-proxy necesita salida a internet para construir
+    # circuitos. El aislamiento aqui lo da la ausencia de ruta hacia `backend`.
+  backend:
+    name: darkintel_backend
+    internal: true
+  frontend:
+    name: darkintel_frontend
+
+volumes:
+  raw_data:      # scraper (rw) -> processor (ro)
+  output_data:   # processor (rw) -> api (ro)
+  pgdata:
+
+services:
+
+  # ── Zona de riesgo ────────────────────────────────────────────────────
+  tor-proxy:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tor
+    image: darkintel/tor-proxy:dev
+    container_name: darkintel-tor
+    networks: [darknet]
+    restart: unless-stopped
+    healthcheck:
+      # Verifica que el SOCKS5 realmente enruta trafico por Tor.
+      test: ["CMD-SHELL", "curl -s --socks5-hostname localhost:9050 https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
+
+  scraper:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.scraper
+    image: darkintel/scraper:dev
+    container_name: darkintel-scraper
+    networks: [darknet]          # sin acceso a backend, por diseno
+    restart: "no"
+    volumes:
+      - raw_data:/app/data/raw   # unico canal hacia el backend
+    environment:
+      # Ya disponible para cuando fetcher.py se conecte via PySocks/stem.
+      # Hoy NO se usa: fetcher.py sigue haciendo requests.get() plano.
+      TOR_SOCKS_PROXY: socks5h://tor-proxy:9050
+    depends_on:
+      - tor-proxy
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Zona de procesamiento ─────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: darkintel-db
+    networks: [backend]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-darkintel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-darkintel_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-darkintel}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-darkintel} -d ${POSTGRES_DB:-darkintel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sin `ports:` — la base de datos no es alcanzable desde el host ni desde
+    # darknet. Para inspeccionarla: docker compose exec db psql -U darkintel
+
+  processor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    image: darkintel/processor:dev
+    container_name: darkintel-processor
+    networks: [backend]
+    restart: "no"                # job de un solo uso, no servicio
+    volumes:
+      - raw_data:/app/data/raw:ro      # solo lectura: nunca escribe hacia darknet
+      - output_data:/app/data/output
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-darkintel}:${POSTGRES_PASSWORD:-darkintel_dev}@db:5432/${POSTGRES_DB:-darkintel}
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Zona de exposicion ────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: darkintel/api:dev
+    container_name: darkintel-api
+    networks: [frontend, backend]   # backend para la futura consulta a la BD
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - output_data:/app/data/output:ro   # solo sirve lo ya generado
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-darkintel}:${POSTGRES_PASSWORD:-darkintel_dev}@db:5432/${POSTGRES_DB:-darkintel}
+    depends_on:
+      processor:
+        condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true

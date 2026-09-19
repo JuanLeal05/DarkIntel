@@ -1,0 +1,49 @@
+# DarkIntel — contenedor de procesamiento (red: backend)
+#
+# Corre el pipeline: NER -> embeddings -> UMAP/HDBSCAN -> STIX 2.1.
+# Lee /app/data/raw en solo-lectura y escribe /app/data/output.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app/src \
+    MPLBACKEND=Agg \
+    HF_HOME=/app/.cache/huggingface \
+    TOKENIZERS_PARALLELISM=false
+
+WORKDIR /app
+
+# hdbscan y umap-learn pueden requerir compilacion si no hay wheel disponible.
+# Las build-deps se instalan y eliminan en la misma capa.
+COPY docker/requirements-backend.txt /tmp/requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && apt-get purge -y --auto-remove build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# El modelo de embeddings se descarga EN BUILD, no en runtime. Esto permite que
+# la red `backend` sea internal (sin salida a internet) y evita que
+# embedder.py vuelva a bajar ~90MB en cada ejecucion.
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
+# Con el modelo ya en la imagen, se fuerza modo offline: sin esto la libreria
+# intenta contactar huggingface.co en cada arranque y, al no haber salida a
+# internet en la red `backend`, gasta ~60s en reintentos de DNS antes de
+# caer al cache local.
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
+COPY src/ /app/src/
+COPY pipeline/ /app/pipeline/
+COPY data/synthetic_darkweb_dump.json /app/data/synthetic_darkweb_dump.json
+COPY docker/run_pipeline.sh /app/run_pipeline.sh
+
+RUN useradd --create-home --uid 1000 processor \
+    && chmod +x /app/run_pipeline.sh \
+    && mkdir -p /app/data/raw /app/data/output \
+    && chown -R processor:processor /app
+USER processor
+
+CMD ["/app/run_pipeline.sh"]
