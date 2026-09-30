@@ -82,6 +82,16 @@ def es_ip_valida(ip: str) -> bool:
         return False
 
 
+def _contexto_sugiere_version(texto: str, inicio_match: int) -> bool:
+    """
+    True si justo antes del número hay una palabra como 'versión'/'version'/
+    'v' (p.ej. 'Apache versión 2.4.51.3'). Un número de versión de 4 partes
+    tiene la misma forma que una IP — solo el contexto los distingue.
+    """
+    ventana = texto[max(0, inicio_match - 20):inicio_match].lower()
+    return bool(re.search(r"(versi[oó]n|ver\.?|\bv)\s*$", ventana))
+
+
 def es_ipv6_valida(ip: str) -> bool:
     """Descarta loopback y link-local."""
     excluidos = ["::1", "fe80"]
@@ -119,12 +129,20 @@ def extraer_iocs(texto: str) -> dict:
     resultado = {}
 
     for tipo, patron in PATTERNS.items():
+        if tipo == "ip":
+            continue  # la IP necesita la posición del match, ver abajo
         coincidencias = re.findall(patron, texto_normalizado, re.IGNORECASE)
         resultado[tipo] = list(set(coincidencias))
 
-    # Validar IPs
+    # IP: se usa finditer (no findall) porque hace falta la posición del
+    # match para poder mirar el contexto y descartar números de versión.
+    ips_candidatas = [
+        m.group()
+        for m in re.finditer(PATTERNS["ip"], texto_normalizado, re.IGNORECASE)
+        if not _contexto_sugiere_version(texto_normalizado, m.start())
+    ]
     resultado["ip"] = [
-        ip for ip in resultado["ip"]
+        ip for ip in set(ips_candidatas)
         if es_ip_valida(ip)
         and not any(ip.startswith(r) for r in RANGOS_EXCLUIDOS)
     ]

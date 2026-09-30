@@ -9,20 +9,18 @@ from darkintel.clustering.embedder import generar_embeddings
 from darkintel.clustering.cluster import reducir_dimensiones, clustering
 from darkintel.stix_builder.builder import construir_bundle
 from darkintel.scraper.storage import guardar_json
-
-
-def cargar_dump(ruta: str) -> list[dict]:
-    with open(ruta, encoding="utf-8") as f:
-        return json.load(f)
+from darkintel.data_loader import cargar_posts
 
 
 def run():
-    ruta_dump = os.path.join(
-        os.path.dirname(__file__), "..", "data", "synthetic_darkweb_dump.json"
-    )
+    posts, es_sintetico = cargar_posts()
+    fuente = "synthetic_darkweb_dump.json" if es_sintetico else "data/raw (scraper real)"
+    print(f"📂 Cargados {len(posts)} posts — fuente: {fuente}\n")
 
-    posts = cargar_dump(ruta_dump)
-    print(f"📂 Cargados {len(posts)} posts\n")
+    if len(posts) < 2:
+        print("⚠️  HDBSCAN necesita al menos 2 posts para agrupar; "
+              "con 1 solo post no hay clustering posible todavía.")
+        return
 
     # 1. Extraer IoCs
     print("🔍 Extrayendo IoCs...")

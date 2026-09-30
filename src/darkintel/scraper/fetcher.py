@@ -8,6 +8,9 @@ try:
 except ImportError:
     _STEM_DISPONIBLE = False
 
+from darkintel.scraper.parser import crear_soup, extraer_texto_pagina, extraer_titulo
+from darkintel.scraper.storage import guardar_json
+
 
 # ── Configuración vía entorno (inyectada por docker-compose) ───────────
 TOR_SOCKS_PROXY = os.environ.get("TOR_SOCKS_PROXY", "")          # socks5h://tor-proxy:9050
@@ -125,5 +128,23 @@ if __name__ == "__main__":
 
     html = obtener_html(url, usar_tor=True)
     print("Longitud del HTML descargado:", len(html))
-    print("Primeros 300 caracteres:")
-    print(html[:300])
+
+    soup = crear_soup(html)
+    texto = extraer_texto_pagina(soup)
+    titulo = extraer_titulo(soup)
+
+    print("Título:", titulo or "(sin título)")
+    print("Texto extraído (primeros 300 chars):")
+    print(texto[:300])
+
+    # Este es el paso que faltaba: sin esto, el pipeline (run_ner/
+    # run_clustering/run_stix) nunca ve lo que el scraper trajo y sigue
+    # analizando solo el dataset sintético.
+    post = {
+        "source": "scraper_tor",
+        "url": url,
+        "titulo": titulo,
+        "text": texto,
+    }
+    ruta_guardada = guardar_json(post, carpeta="data/raw")
+    print(f"✅ Post guardado en: {ruta_guardada}")

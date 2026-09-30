@@ -1,16 +1,10 @@
 import sys
 import os
-import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from darkintel.ner.extractor import extraer_iocs
-
-
-def cargar_dump(ruta: str) -> list[dict]:
-    """Lee el archivo JSON de mock data."""
-    with open(ruta, encoding="utf-8") as f:
-        return json.load(f)
+from darkintel.data_loader import cargar_posts
 
 
 def evaluar_post(detectado: dict, esperado: dict) -> dict:
@@ -64,38 +58,46 @@ def calcular_metricas(tp: int, fp: int, fn: int) -> dict:
 
 
 def run():
-    ruta_dump = os.path.join(
-        os.path.dirname(__file__), "..", "data", "synthetic_darkweb_dump.json"
-    )
-
-    posts = cargar_dump(ruta_dump)
-    print(f"📂 Cargados {len(posts)} posts\n")
+    posts, es_sintetico = cargar_posts()
+    fuente = "synthetic_darkweb_dump.json" if es_sintetico else "data/raw (scraper real)"
+    print(f"📂 Cargados {len(posts)} posts — fuente: {fuente}\n")
 
     tp_total, fp_total, fn_total = 0, 0, 0
 
     for post in posts:
         iocs = extraer_iocs(post["text"])
-        metricas = evaluar_post(iocs, post["labels_manual"])
-
-        tp_total += metricas["tp"]
-        fp_total += metricas["fp"]
-        fn_total += metricas["fn"]
-
         print(f"[{post['post_id']}]")
         print(f"  Detectado: { {k: v for k, v in iocs.items() if v} }")
-        print(f"  Esperado:  {post['labels_manual']}")
-        print(f"  TP={metricas['tp']} FP={metricas['fp']} FN={metricas['fn']}")
+
+        if post.get("labels_manual") is not None:
+            metricas = evaluar_post(iocs, post["labels_manual"])
+            tp_total += metricas["tp"]
+            fp_total += metricas["fp"]
+            fn_total += metricas["fn"]
+            print(f"  Esperado:  {post['labels_manual']}")
+            print(f"  TP={metricas['tp']} FP={metricas['fp']} FN={metricas['fn']}")
+        else:
+            # Post real sin ground truth (viene del scraper, no del dataset
+            # etiquetado): se reporta lo detectado, no se puede medir
+            # precisión/recall porque no hay con qué comparar.
+            print("  (sin labels_manual — post real, no se calculan métricas)")
         print()
 
-    metricas_finales = calcular_metricas(tp_total, fp_total, fn_total)
-
-    print("=" * 50)
-    print("RESULTADO FINAL")
-    print("=" * 50)
-    print(f"  Precision : {metricas_finales['precision'] * 100:.1f}%")
-    print(f"  Recall    : {metricas_finales['recall']    * 100:.1f}%")
-    print(f"  F1-score  : {metricas_finales['f1']        * 100:.1f}%")
-    print(f"  TP={tp_total} FP={fp_total} FN={fn_total}")
+    if es_sintetico:
+        metricas_finales = calcular_metricas(tp_total, fp_total, fn_total)
+        print("=" * 50)
+        print("RESULTADO FINAL (dataset sintético)")
+        print("=" * 50)
+        print(f"  Precision : {metricas_finales['precision'] * 100:.1f}%")
+        print(f"  Recall    : {metricas_finales['recall']    * 100:.1f}%")
+        print(f"  F1-score  : {metricas_finales['f1']        * 100:.1f}%")
+        print(f"  TP={tp_total} FP={fp_total} FN={fn_total}")
+    else:
+        print("=" * 50)
+        print("Datos reales: no hay ground truth para calcular métricas.")
+        print("Para medir precisión/recall, usa el dataset sintético")
+        print("(borra o mueve data/raw/*.json y vuelve a correr).")
+        print("=" * 50)
 
 
 if __name__ == "__main__":

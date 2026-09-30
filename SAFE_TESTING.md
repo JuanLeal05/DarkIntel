@@ -53,6 +53,22 @@ Qué validar:
 Si esta etapa falla, el problema está en tu código o tu configuración de
 Tor — no en el objetivo. Resuélvelo aquí antes de seguir.
 
+### Cierre del ciclo: ¿el análisis sí procesa lo scrapeado?
+
+El scraper ya guarda el post en `data/raw/` (vía `storage.guardar_json`).
+Corre el pipeline justo después, en el mismo volumen, para confirmar que
+`run_ner.py` lo recoge automáticamente en vez de usar el dataset sintético:
+
+```bash
+docker compose --profile testing run --rm processor python pipeline/run_ner.py
+```
+
+Debe imprimir `fuente: data/raw (scraper real)` y detectar los IoCs de
+prueba que trae `docker/test-onion/index.html` (una IP, un CVE y un hash,
+todos marcados como "de prueba" para no confundirlos con datos reales).
+Esto es lo que confirma el objetivo completo de la aplicación de punta a
+punta — no solo que Tor conecta, sino que lo que trae se analiza.
+
 ---
 
 ## Etapa 2 — Un `.onion` público pero legítimo y documentado
