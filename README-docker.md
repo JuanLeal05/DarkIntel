@@ -1,8 +1,10 @@
 # DarkIntel — Despliegue con Docker
 
 Contenerizacion del codigo **que ya existe**, con aislamiento de red en tres
-zonas. La integracion con Tor todavia **no** esta implementada: ver
-[Pendiente: integracion Tor](#pendiente-integracion-tor).
+zonas. La integracion con Tor ya esta implementada (`fetcher.py` enruta por
+SOCKS5 y rota circuitos via ControlPort/stem); ver
+[SAFE_TESTING.md](SAFE_TESTING.md) para el orden de pruebas antes de apuntar
+a un objetivo real.
 
 ## Arquitectura de red
 
@@ -87,40 +89,14 @@ Re-ejecutar solo el pipeline: `docker compose run --rm processor`.
 |---|---|
 | `api` | Funcional. Sirve los bundles generados. |
 | `processor` | Funcional sobre `data/synthetic_darkweb_dump.json` (datos sinteticos, no scrapeados). |
-| `scraper` | **Placeholder.** Corre el `__main__` de `fetcher.py`: HTTP plano contra `books.toscrape.com`. No usa Tor. |
-| `tor-proxy` | Daemon real y funcional, pero **ningun servicio lo usa todavia**. |
-| `db` | Levanta con el esquema de `docker/postgres/init.sql`, pero el codigo sigue guardando JSON plano. |
+| `scraper` | Funcional: enruta por `TOR_SOCKS_PROXY` (`socks5h://`), rota circuitos con `stem`/`NEWNYM`, timeout 90s y limite de tamano de respuesta. Objetivo controlado por `SCRAPER_TARGET_URL` (ver `SAFE_TESTING.md`). |
+| `tor-proxy` | Daemon real y funcional, con `ControlPort` autenticado; ahora consumido por `scraper`. |
+| `test-onion` | Hidden service propio para pruebas (perfil `testing`, no se levanta en `up` normal). Ver `SAFE_TESTING.md` Etapa 1. |
+| `db` | Levanta con el esquema de `docker/postgres/init.sql`, pero el codigo sigue guardando JSON plano — pendiente para una siguiente iteracion. |
 
-## Pendiente: integracion Tor
+## Antes de correr el scraper contra un objetivo real
 
-Lo que habria que cambiar cuando se implemente (no hecho aun):
-
-**`docker/requirements-scraper.txt`**
-```
-PySocks==1.7.1     # backend SOCKS5 para requests
-stem>=1.8.2        # control de circuitos Tor via ControlPort
-```
-(Playwright, si se agrega, requiere ademas `playwright install --with-deps
-chromium` en `Dockerfile.scraper` y sube la imagen a >1GB.)
-
-**`src/darkintel/scraper/fetcher.py`** — hoy:
-```python
-respuesta = requests.get(url, timeout=10)
-```
-tendria que pasar por el proxy que ya se inyecta como variable de entorno
-`TOR_SOCKS_PROXY` (ya definida en `docker-compose.yml`):
-```python
-proxies = {"http": os.environ["TOR_SOCKS_PROXY"],
-           "https": os.environ["TOR_SOCKS_PROXY"]}
-respuesta = requests.get(url, proxies=proxies, timeout=60)
-```
-El esquema debe ser `socks5h://` (no `socks5://`): la `h` hace que la
-resolucion DNS ocurra **en** el proxy Tor, que es lo que permite resolver
-`.onion` y evita fugas de DNS al resolver local.
-
-**`docker/torrc`** — descomentar `ControlPort` y fijar
-`HashedControlPassword` para que Stem pueda pedir circuitos nuevos
-(`NEWNYM`). Sin autenticacion configurada, el ControlPort es un riesgo.
-
-**Timeouts** — los servicios `.onion` son lentos; `timeout=10` es
-insuficiente. 60-120s es lo razonable.
+**No lo pruebes directo contra dark web real.** Sigue el orden de
+[SAFE_TESTING.md](SAFE_TESTING.md): unitarios sin red → hidden service
+propio (riesgo cero) → `.onion` legitimo conocido → objetivo real, y solo
+en una VM desechable, nunca en un equipo personal.

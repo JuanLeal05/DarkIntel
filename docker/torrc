@@ -20,7 +20,16 @@ Log notice stdout
 MaxCircuitDirtiness 60
 
 # ControlPort — necesario para la rotacion programatica de circuitos con Stem
-# (Python). Se deja comentado hasta que se implemente esa parte: abrirlo sin
-# autenticacion configurada seria un riesgo innecesario.
-# ControlPort 0.0.0.0:9051
-# HashedControlPassword <generar con: tor --hash-password "<password>">
+# (Python) desde el contenedor scraper. NO se publica al host (mismo criterio
+# que SocksPort): solo alcanzable dentro de la red darknet.
+#
+# El hash de abajo corresponde a la contraseña de ejemplo
+# "cambia_esta_password_de_control" — CAMBIARLA antes de cualquier uso real:
+#
+#   docker compose run --rm tor-proxy tor --hash-password "tu_password_aqui"
+#
+# y copiar la línea "16:XXXX..." que imprime. La contraseña en texto plano
+# (no el hash) va en la variable de entorno TOR_CONTROL_PASSWORD del
+# servicio `scraper` en docker-compose.yml / .env — nunca en este archivo.
+ControlPort 0.0.0.0:9051
+HashedControlPassword 16:7576BC074950FCCB603838F1A5FCD9DC71138415BD5F7D77C7B6A9B3CC

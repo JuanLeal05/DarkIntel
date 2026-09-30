@@ -48,6 +48,19 @@ services:
       retries: 5
       start_period: 60s
 
+  # Objetivo de prueba local — ver SAFE_TESTING.md, Etapa 1. NO se levanta
+  # con `docker compose up`: solo con `--profile testing`, para que no
+  # termine expuesto por accidente fuera del entorno de pruebas.
+  test-onion:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.test-onion
+    image: darkintel/test-onion:dev
+    container_name: darkintel-test-onion
+    networks: [darknet]
+    profiles: ["testing"]
+    restart: "no"
+
   scraper:
     build:
       context: .
@@ -59,11 +72,15 @@ services:
     volumes:
       - raw_data:/app/data/raw   # unico canal hacia el backend
     environment:
-      # Ya disponible para cuando fetcher.py se conecte via PySocks/stem.
-      # Hoy NO se usa: fetcher.py sigue haciendo requests.get() plano.
       TOR_SOCKS_PROXY: socks5h://tor-proxy:9050
+      TOR_CONTROL_HOST: tor-proxy
+      TOR_CONTROL_PORT: 9051
+      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:-cambia_esta_password_de_control}
+      # Controla la etapa de prueba sin tocar código (ver SAFE_TESTING.md).
+      SCRAPER_TARGET_URL: ${SCRAPER_TARGET_URL:-http://test-onion:80}
     depends_on:
-      - tor-proxy
+      tor-proxy:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
 
