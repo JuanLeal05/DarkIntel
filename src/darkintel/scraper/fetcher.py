@@ -1,4 +1,6 @@
 import os
+import socket
+
 import requests
 
 try:
@@ -61,7 +63,11 @@ def renovar_circuito() -> bool:
     if not TOR_CONTROL_PASSWORD:
         return False
     try:
-        with Controller.from_port(address=TOR_CONTROL_HOST, port=TOR_CONTROL_PORT) as controlador:
+        # stem exige una IP literal: Controller.from_port falla con
+        # "Invalid IP address: tor-proxy" si se le pasa el nombre DNS del
+        # servicio Docker. Hay que resolverlo antes.
+        direccion = socket.gethostbyname(TOR_CONTROL_HOST)
+        with Controller.from_port(address=direccion, port=TOR_CONTROL_PORT) as controlador:
             controlador.authenticate(password=TOR_CONTROL_PASSWORD)
             controlador.signal(Signal.NEWNYM)
         return True
@@ -113,38 +119,55 @@ def obtener_html(url: str, usar_tor: bool = True, timeout: int = None) -> str:
 if __name__ == "__main__":
     # Objetivo controlado por entorno: ver SAFE_TESTING.md para el orden de
     # etapas (servicio local propio -> onion legítimo conocido -> objetivo real).
-    url = os.environ.get("SCRAPER_TARGET_URL", "")
-    if not url:
+    # SCRAPER_TARGET_URL acepta varias URLs separadas por coma. El pipeline
+    # necesita al menos 4 posts para que UMAP/HDBSCAN funcionen, así que una
+    # sola página no alcanza para la demo completa.
+    crudo = os.environ.get("SCRAPER_TARGET_URL", "")
+    urls = [u.strip() for u in crudo.split(",") if u.strip()]
+    if not urls:
         raise SystemExit(
             "Define SCRAPER_TARGET_URL antes de correr el scraper "
             "(ver SAFE_TESTING.md)."
         )
 
-    print(f"🎯 Objetivo: {url}")
     print(f"🧦 Proxy Tor: {TOR_SOCKS_PROXY or '(no configurado)'}")
+    print(f"🎯 {len(urls)} objetivo(s)\n")
 
-    if renovar_circuito():
-        print("🔄 Circuito Tor renovado (NEWNYM)")
+    fallidas = 0
+    for url in urls:
+        print(f"── {url}")
 
-    html = obtener_html(url, usar_tor=True)
-    print("Longitud del HTML descargado:", len(html))
+        # Circuito nuevo por cada objetivo: evita que todas las peticiones
+        # salgan por la misma ruta.
+        if renovar_circuito():
+            print("   🔄 Circuito Tor renovado (NEWNYM)")
 
-    soup = crear_soup(html)
-    texto = extraer_texto_pagina(soup)
-    titulo = extraer_titulo(soup)
+        try:
+            html = obtener_html(url, usar_tor=True)
+        except Exception as error:
+            # Un objetivo caído no debe tumbar el resto del rastreo.
+            print(f"   ❌ Falló: {type(error).__name__}: {error}")
+            fallidas += 1
+            continue
 
-    print("Título:", titulo or "(sin título)")
-    print("Texto extraído (primeros 300 chars):")
-    print(texto[:300])
+        soup = crear_soup(html)
+        texto = extraer_texto_pagina(soup)
+        titulo = extraer_titulo(soup)
 
-    # Este es el paso que faltaba: sin esto, el pipeline (run_ner/
-    # run_clustering/run_stix) nunca ve lo que el scraper trajo y sigue
-    # analizando solo el dataset sintético.
-    post = {
-        "source": "scraper_tor",
-        "url": url,
-        "titulo": titulo,
-        "text": texto,
-    }
-    ruta_guardada = guardar_json(post, carpeta="data/raw")
-    print(f"✅ Post guardado en: {ruta_guardada}")
+        print(f"   Título: {titulo or '(sin título)'} — {len(html)} bytes")
+
+        # Este es el paso que faltaba: sin esto, el pipeline (run_ner/
+        # run_clustering/run_stix) nunca ve lo que el scraper trajo y sigue
+        # analizando solo el dataset sintético.
+        post = {
+            "source": "scraper_tor",
+            "url": url,
+            "titulo": titulo,
+            "text": texto,
+        }
+        ruta_guardada = guardar_json(post, carpeta="data/raw")
+        print(f"   ✅ Guardado en: {ruta_guardada}")
+
+    print(f"\n{len(urls) - fallidas}/{len(urls)} objetivos recolectados.")
+    if fallidas:
+        raise SystemExit(1)

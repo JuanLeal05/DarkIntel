@@ -29,16 +29,33 @@ respuesta parseada — sin que un solo byte salga hacia la dark web pública.
 `test-onion` es un hidden service que armamos nosotros, con contenido
 inocuo que escribimos nosotros.
 
+Precision importante: el *contenido* nunca sale de tus contenedores, pero el
+trafico de protocolo Tor si toca la red real — tu hidden service publica su
+descriptor en las autoridades de directorio y el scraper lo consulta de
+vuelta. Es inevitable para probar contra un `.onion` de verdad y no implica
+ninguna exposicion a contenido de dark web.
+
 ```bash
-cp .env.example .env    # SCRAPER_TARGET_URL ya apunta a http://test-onion:80
+cp .env.example .env
 
 docker compose --profile testing up -d --build test-onion tor-proxy
 
-# Espera a que el hidden service publique su dirección .onion:
-docker compose logs test-onion | grep -i "service.*published\|onion"
+# Lee la direccion .onion que genero el hidden service (puede tardar ~1 min
+# en aparecer la primera vez):
+ONION=$(docker compose exec -T test-onion cat /var/lib/tor/test_service/hostname | tr -d '\r\n')
+echo $ONION
 
-docker compose --profile testing run --rm scraper
+# Scrapea las 4 paginas de prueba de una sola corrida (el pipeline necesita
+# al menos 4 posts para que UMAP/HDBSCAN funcionen):
+docker compose --profile testing run --rm \
+  -e SCRAPER_TARGET_URL="http://$ONION/post1.html,http://$ONION/post2.html,http://$ONION/post3.html,http://$ONION/post4.html" \
+  scraper
 ```
+
+**No uses `http://test-onion:80` como objetivo.** Es un nombre DNS de Docker,
+y `socks5h://` se lo entrega a Tor para que lo resuelva — Tor no sabe qué es
+y falla con `0x04 Host unreachable`. El objetivo tiene que ser la direccion
+`.onion` real.
 
 Qué validar:
 - El log del scraper debe mostrar `🔄 Circuito Tor renovado (NEWNYM)` —

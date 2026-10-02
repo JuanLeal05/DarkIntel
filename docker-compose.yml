@@ -26,6 +26,8 @@ networks:
 
 volumes:
   raw_data:      # scraper (rw) -> processor (ro)
+  testonion_data:  # claves del hidden service de prueba: sin esto la direccion
+                   # .onion cambia en cada recreacion del contenedor
   output_data:   # processor (rw) -> api (ro)
   pgdata:
 
@@ -60,6 +62,10 @@ services:
     networks: [darknet]
     profiles: ["testing"]
     restart: "no"
+    volumes:
+      # Persiste las claves del hidden service para que la direccion .onion
+      # sea estable entre reinicios (si no, hay que volver a leerla cada vez).
+      - testonion_data:/var/lib/tor
 
   scraper:
     build:
@@ -77,7 +83,9 @@ services:
       TOR_CONTROL_PORT: 9051
       TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:-cambia_esta_password_de_control}
       # Controla la etapa de prueba sin tocar código (ver SAFE_TESTING.md).
-      SCRAPER_TARGET_URL: ${SCRAPER_TARGET_URL:-http://test-onion:80}
+      # Sin valor por defecto a proposito: si no se define, fetcher.py sale
+      # con un mensaje claro en vez de fallar contra un objetivo invalido.
+      SCRAPER_TARGET_URL: ${SCRAPER_TARGET_URL:-}
     depends_on:
       tor-proxy:
         condition: service_healthy

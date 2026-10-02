@@ -11,15 +11,23 @@ from darkintel.stix_builder.builder import construir_bundle
 from darkintel.scraper.storage import guardar_json
 from darkintel.data_loader import cargar_posts
 
+# UMAP no funciona con muy pocas muestras: con 2 posts lanza "zero-size array
+# to reduction operation maximum" y con 3 un TypeError de scipy.linalg.eigh.
+# Medido empíricamente: 4 es el mínimo con el que corre limpio.
+MINIMO_POSTS_CLUSTERING = 4
+
 
 def run():
     posts, es_sintetico = cargar_posts()
     fuente = "synthetic_darkweb_dump.json" if es_sintetico else "data/raw (scraper real)"
     print(f"📂 Cargados {len(posts)} posts — fuente: {fuente}\n")
 
-    if len(posts) < 2:
-        print("⚠️  HDBSCAN necesita al menos 2 posts para agrupar; "
-              "con 1 solo post no hay clustering posible todavía.")
+    if len(posts) < MINIMO_POSTS_CLUSTERING:
+        print(f"⚠️  Hacen falta al menos {MINIMO_POSTS_CLUSTERING} posts para "
+              f"agrupar y solo hay {len(posts)}.")
+        print("    UMAP falla por debajo de ese umbral (con 2 posts lanza "
+              "'zero-size array'; con 3, un error de scipy.linalg).")
+        print("    Scrapea más páginas y vuelve a correr.")
         return
 
     # 1. Extraer IoCs
