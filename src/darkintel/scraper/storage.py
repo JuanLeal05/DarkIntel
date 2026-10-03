@@ -11,7 +11,7 @@ def guardar_json(datos: dict, carpeta: str = "data/raw",
     os.makedirs(carpeta, exist_ok=True)
 
     if nombre_archivo is None:
-        marca = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        marca = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         nombre_archivo = f"resultado_{marca}.json"
 
     ruta = os.path.join(carpeta, nombre_archivo)

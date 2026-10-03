@@ -95,12 +95,12 @@ igual que el local, contra un servicio que es *sabidamente seguro y
 propiedad de una organización conocida*. No es dark web ilícita.
 
 Objetivos recomendados (operados por organizaciones verificables):
-- `http://checkth4tp3riwtvpasfa4o5b2ke2zqcugkatvdw7pl5x5yr06y6vzid.onion` —
-  la propia herramienta de verificación del Tor Project
-  (`check.torproject.org` en su versión `.onion`).
+- `http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion` —
+  el sitio oficial del Tor Project, listado en onion.torproject.org
+  (`www.torproject.org` en su versión `.onion`).
 
 ```bash
-echo "SCRAPER_TARGET_URL=http://checkth4tp3riwtvpasfa4o5b2ke2zqcugkatvdw7pl5x5yr06y6vzid.onion" >> .env
+echo "SCRAPER_TARGET_URL=http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion" >> .env
 
 docker compose up -d tor-proxy
 docker compose run --rm scraper
