@@ -32,4 +32,3 @@ MaxCircuitDirtiness 60
 # (no el hash) va en la variable de entorno TOR_CONTROL_PASSWORD del
 # servicio `scraper` en docker-compose.yml / .env — nunca en este archivo.
 ControlPort 0.0.0.0:9051
-HashedControlPassword 16:7576BC074950FCCB603838F1A5FCD9DC71138415BD5F7D77C7B6A9B3CC

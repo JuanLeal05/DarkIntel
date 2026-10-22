@@ -1,23 +1,34 @@
-# DarkIntel — orquestacion con aislamiento de red en tres zonas.
+# DarkIntel — orquestacion con aislamiento de red en cuatro redes.
 #
-#   darknet   (riesgo)      : tor-proxy + scraper. Salida a internet, SIN ruta
-#                             hacia backend y sin credenciales de base de datos.
-#   backend   (procesamiento): processor + db. internal=true, sin salida a
-#                             internet. Nunca escribe hacia darknet.
-#   frontend  (exposicion)   : api. Unico servicio con puerto publicado.
+#   tor_egress (salida)      : SOLO tor-proxy y test-onion. Unica red con
+#                              salida a internet, y solo la usa el daemon Tor.
+#   darknet    (riesgo)      : tor-proxy + scraper (+ test-onion). internal=true:
+#                              el scraper NO tiene salida directa a internet;
+#                              su unico camino hacia afuera es el SOCKS de Tor.
+#                              Si algo intenta salir sin Tor, no hay ruta (fail-closed).
+#   backend    (procesamiento): processor + db. internal=true, sin salida a
+#                              internet. Nunca escribe hacia darknet.
+#   frontend   (exposicion)   : api. Unico servicio con puerto publicado.
 #
 # El volumen raw_data es el UNICO punto de contacto entre darknet y backend:
 # el scraper lo escribe, el processor lo lee en solo-lectura. Si el contenedor
 # del scraper se ve comprometido por contenido .onion, no tiene ruta de red
-# hacia la base de datos.
+# hacia la base de datos ni hacia internet sin pasar por Tor.
+#
+# Variables obligatorias (definirlas en .env): POSTGRES_PASSWORD y
+# TOR_CONTROL_PASSWORD. Sin ellas `docker compose` se niega a arrancar, a
+# proposito: nada de contraseñas por defecto conocidas.
 
 name: darkintel
 
 networks:
+  tor_egress:
+    name: darkintel_tor_egress
+    # NO es internal: el daemon Tor necesita salida a internet para construir
+    # circuitos. Solo tor-proxy y test-onion se conectan aqui.
   darknet:
     name: darkintel_darknet
-    # NO es internal: tor-proxy necesita salida a internet para construir
-    # circuitos. El aislamiento aqui lo da la ausencia de ruta hacia `backend`.
+    internal: true          # scraper <-> tor-proxy, sin salida directa
   backend:
     name: darkintel_backend
     internal: true
@@ -25,10 +36,10 @@ networks:
     name: darkintel_frontend
 
 volumes:
-  raw_data:      # scraper (rw) -> processor (ro)
+  raw_data:        # scraper (rw) -> processor (ro)
   testonion_data:  # claves del hidden service de prueba: sin esto la direccion
                    # .onion cambia en cada recreacion del contenedor
-  output_data:   # processor (rw) -> api (ro)
+  output_data:     # processor (rw) -> api (ro)
   pgdata:
 
 services:
@@ -40,8 +51,15 @@ services:
       dockerfile: docker/Dockerfile.tor
     image: darkintel/tor-proxy:dev
     container_name: darkintel-tor
-    networks: [darknet]
+    # darknet: para que el scraper lo alcance como tor-proxy:9050
+    # tor_egress: para que Tor pueda salir a internet
+    networks: [darknet, tor_egress]
     restart: unless-stopped
+    environment:
+      # El entrypoint genera el HashedControlPassword a partir de esta
+      # variable al arrancar (ver docker/tor-entrypoint.sh). El hash ya no
+      # vive en docker/torrc ni en el repositorio.
+      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:?Define TOR_CONTROL_PASSWORD en .env}
     healthcheck:
       # Verifica que el SOCKS5 realmente enruta trafico por Tor.
       test: ["CMD-SHELL", "curl -s --socks5-hostname localhost:9050 https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'"]
@@ -49,6 +67,8 @@ services:
       timeout: 20s
       retries: 5
       start_period: 60s
+    security_opt:
+      - no-new-privileges:true
 
   # Objetivo de prueba local — ver SAFE_TESTING.md, Etapa 1. NO se levanta
   # con `docker compose up`: solo con `--profile testing`, para que no
@@ -59,13 +79,17 @@ services:
       dockerfile: docker/Dockerfile.test-onion
     image: darkintel/test-onion:dev
     container_name: darkintel-test-onion
-    networks: [darknet]
+    # tor_egress: su propio daemon Tor necesita publicar el descriptor del
+    # hidden service en la red Tor.
+    networks: [darknet, tor_egress]
     profiles: ["testing"]
     restart: "no"
     volumes:
       # Persiste las claves del hidden service para que la direccion .onion
       # sea estable entre reinicios (si no, hay que volver a leerla cada vez).
       - testonion_data:/var/lib/tor
+    security_opt:
+      - no-new-privileges:true
 
   scraper:
     build:
@@ -73,7 +97,7 @@ services:
       dockerfile: docker/Dockerfile.scraper
     image: darkintel/scraper:dev
     container_name: darkintel-scraper
-    networks: [darknet]          # sin acceso a backend, por diseno
+    networks: [darknet]          # SOLO darknet (internal): sin backend y sin internet directo
     restart: "no"
     volumes:
       - raw_data:/app/data/raw   # unico canal hacia el backend
@@ -81,7 +105,7 @@ services:
       TOR_SOCKS_PROXY: socks5h://tor-proxy:9050
       TOR_CONTROL_HOST: tor-proxy
       TOR_CONTROL_PORT: 9051
-      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:-cambia_esta_password_de_control}
+      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:?Define TOR_CONTROL_PASSWORD en .env}
       # Controla la etapa de prueba sin tocar código (ver SAFE_TESTING.md).
       # Sin valor por defecto a proposito: si no se define, fetcher.py sale
       # con un mensaje claro en vez de fallar contra un objetivo invalido.
@@ -100,7 +124,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-darkintel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-darkintel_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
       POSTGRES_DB: ${POSTGRES_DB:-darkintel}
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -125,7 +149,7 @@ services:
       - raw_data:/app/data/raw:ro      # solo lectura: nunca escribe hacia darknet
       - output_data:/app/data/output
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-darkintel}:${POSTGRES_PASSWORD:-darkintel_dev}@db:5432/${POSTGRES_DB:-darkintel}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-darkintel}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/${POSTGRES_DB:-darkintel}
     depends_on:
       db:
         condition: service_healthy
@@ -139,14 +163,17 @@ services:
       dockerfile: docker/Dockerfile.api
     image: darkintel/api:dev
     container_name: darkintel-api
-    networks: [frontend, backend]   # backend para la futura consulta a la BD
+    # Solo frontend: hoy la API no usa la BD, asi que no necesita ruta hacia
+    # backend ni credenciales. Cuando lea de PostgreSQL, volver a agregar
+    # `backend` y usar un rol de SOLO LECTURA, no el usuario principal.
+    networks: [frontend]
     restart: unless-stopped
     ports:
-      - "${API_PORT:-8000}:8000"
+      # 127.0.0.1: la API solo es accesible desde el propio host, no desde
+      # la red local ni internet.
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
       - output_data:/app/data/output:ro   # solo sirve lo ya generado
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-darkintel}:${POSTGRES_PASSWORD:-darkintel_dev}@db:5432/${POSTGRES_DB:-darkintel}
     depends_on:
       processor:
         condition: service_completed_successfully

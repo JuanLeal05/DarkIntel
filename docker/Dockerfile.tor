@@ -10,9 +10,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/torrc /etc/tor/torrc
+COPY docker/tor-entrypoint.sh /usr/local/bin/tor-entrypoint.sh
+# Windows guarda los archivos con CRLF; un script con \r no arranca en Linux.
+RUN sed -i 's/\r$//' /usr/local/bin/tor-entrypoint.sh \
+    && chmod 755 /usr/local/bin/tor-entrypoint.sh
 
-# El puerto SOCKS NO se publica al host: solo es alcanzable desde la red darknet.
 EXPOSE 9050
-
 USER debian-tor
-CMD ["tor", "-f", "/etc/tor/torrc"]
+CMD ["/usr/local/bin/tor-entrypoint.sh"]

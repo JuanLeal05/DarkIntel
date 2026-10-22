@@ -1,5 +1,6 @@
 import os
 import socket
+import time
 
 import requests
 
@@ -69,6 +70,9 @@ def renovar_circuito() -> bool:
         direccion = socket.gethostbyname(TOR_CONTROL_HOST)
         with Controller.from_port(address=direccion, port=TOR_CONTROL_PORT) as controlador:
             controlador.authenticate(password=TOR_CONTROL_PASSWORD)
+            espera = controlador.get_newnym_wait()   # segundos hasta que Tor acepte otro NEWNYM
+            if espera > 0:
+                time.sleep(espera)
             controlador.signal(Signal.NEWNYM)
         return True
     except Exception as error:

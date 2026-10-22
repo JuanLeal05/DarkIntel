@@ -279,6 +279,13 @@ def test_no_detecta_ipv6_loopback():
     print("✅ test_no_detecta_ipv6_loopback superado")
 
 
+def test_no_redos_en_texto_largo():
+    import time
+    t = time.time()
+    extraer_iocs("a." * 50000 + "!")
+    assert time.time() - t < 2
+
+
 # ── Tests de ofuscación avanzada ─────────────────────────────
 
 def test_zero_width_characters_ignorados():
