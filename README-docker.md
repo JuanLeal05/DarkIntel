@@ -1,102 +1,202 @@
 # DarkIntel — Despliegue con Docker
 
-Contenerizacion del codigo **que ya existe**, con aislamiento de red en tres
-zonas. La integracion con Tor ya esta implementada (`fetcher.py` enruta por
-SOCKS5 y rota circuitos via ControlPort/stem); ver
-[SAFE_TESTING.md](SAFE_TESTING.md) para el orden de pruebas antes de apuntar
-a un objetivo real.
+Orquestación completa del pipeline (scraper Tor → NER → clustering → STIX 2.1
+→ API) con aislamiento de red en cuatro redes. Antes de apuntar el scraper a
+un objetivo real, sigue el orden de pruebas de [SAFE_TESTING.md](SAFE_TESTING.md).
 
 ## Arquitectura de red
 
 ```
-        INTERNET
-            |
-   ┌────────┴─────────────────────────────┐
-   │  darknet  (zona de riesgo)           │
-   │                                      │
-   │   tor-proxy  ◄── socks5 :9050 ──  scraper
-   │   (Tor daemon)                       │   │
-   └──────────────────────────────────────┘   │
-                                              │ escribe
-                              volumen raw_data │  (rw)
-                        ◄─── UNICO PUNTO DE ───┘
-                             CONTACTO
-                                   │ lee (ro)
-   ┌───────────────────────────────┼──────────┐
-   │  backend  (internal: true)    ▼          │
-   │                                          │
-   │   processor ──────────► db (Postgres     │
-   │   NER, embeddings,         + pgvector)   │
-   │   clustering, STIX                       │
-   └──────────────┬───────────────────────────┘
-                  │ volumen output_data (ro)
-   ┌──────────────┼───────────────────────────┐
-   │  frontend    ▼                           │
-   │            api (FastAPI)  ──► :8000 host │
-   └──────────────────────────────────────────┘
+                         INTERNET
+                            │
+          ┌─────────────────┴───────────────────┐
+          │  tor_egress  (única red con salida) │
+          │                                     │
+          │   tor-proxy          test-onion*    │
+          └─────┬───────────────────────┬───────┘
+                │                       │
+          ┌─────┴───────────────────────┴───────┐
+          │  darknet  (internal: true)          │
+          │                                     │
+          │   scraper ── socks5h :9050 ──► tor-proxy
+          │           ── control  :9051 ──►     │
+          └─────┬───────────────────────────────┘
+                │ escribe (rw)
+                ▼
+        volumen raw_data   ◄── ÚNICO punto de contacto
+                │              entre la zona de riesgo y el backend
+                │ lee (ro) + validación (data_loader.py)
+          ┌─────┴───────────────────────────────┐
+          │  backend  (internal: true)          │
+          │                                     │
+          │   processor ─────────► db           │
+          │   NER, embeddings,     (Postgres +  │
+          │   UMAP/HDBSCAN, STIX    pgvector)   │
+          └─────┬───────────────────────────────┘
+                │ volumen output_data (ro)
+          ┌─────┴───────────────────────────────┐
+          │  frontend                           │
+          │   api (FastAPI) ──► 127.0.0.1:8000  │
+          └─────────────────────────────────────┘
+
+  * test-onion solo existe con --profile testing
 ```
 
-Decisiones de seguridad detras del diseno:
+## Decisiones de seguridad
 
-| Decision | Motivo |
+| Decisión | Motivo |
 |---|---|
-| `scraper` solo en `darknet` | No tiene ruta de red hacia `db`. Si se ve comprometido por contenido `.onion`, no alcanza la base de datos. |
-| `scraper` sin credenciales de BD | No puede filtrar lo que no tiene. |
-| `backend` con `internal: true` | Sin salida a internet. El modelo de embeddings se descarga en build, no en runtime. |
-| `raw_data` montado `:ro` en `processor` | El flujo de datos es unidireccional: darknet -> backend, nunca al reves. |
+| `scraper` solo en `darknet`, que es `internal: true` | El scraper **no tiene salida directa a internet**: su único camino hacia afuera es el SOCKS de Tor. Si un bug o un contenedor comprometido intenta salir sin Tor, no hay ruta (*fail-closed*): la IP real del host no puede filtrarse. |
+| Solo `tor-proxy` y `test-onion` en `tor_egress` | Son los únicos procesos que necesitan internet: el daemon Tor para construir circuitos y el hidden service de prueba para publicar su descriptor. |
+| `socks5h://` obligatorio | La "h" hace que el DNS se resuelva dentro de Tor: permite resolver `.onion` y evita fugas de DNS. `fetcher.py` rechaza cualquier otro esquema. |
+| Hash del ControlPort generado al arrancar | `docker/tor-entrypoint.sh` calcula `HashedControlPassword` desde `TOR_CONTROL_PASSWORD`. No hay hashes ni contraseñas por defecto en el repositorio. |
+| `scraper` sin credenciales de BD ni ruta a `backend` | Si se ve comprometido por contenido `.onion`, no alcanza la base de datos. |
+| `raw_data` montado `:ro` en `processor` | Flujo unidireccional: darknet → backend, nunca al revés. |
+| `data/raw` validado como frontera de confianza | `data_loader.py` ignora symlinks, mide el tamaño antes de leer, valida cada post con un esquema estricto, descarta campos desconocidos y fuerza `labels_manual = None` (un scraper comprometido no puede falsear las métricas). |
+| `backend` con `internal: true` | Sin salida a internet. El modelo de embeddings se descarga en el build, no en runtime. |
 | `db` sin `ports:` publicados | No alcanzable desde el host ni desde `darknet`. |
-| Puerto SOCKS de Tor sin publicar | Solo alcanzable dentro de `darknet`. |
-| Usuarios sin privilegios + `no-new-privileges` | Ningun contenedor de codigo propio corre como root. |
+| `api` solo en `frontend`, publicada en `127.0.0.1` | Sin credenciales ni ruta a la BD mientras no la necesite; solo accesible desde el propio host. Entrada validada con Pydantic (422) y cuerpo limitado (413). |
+| Usuarios sin privilegios + `no-new-privileges` | Ningún contenedor de código propio corre como root. |
 
 ## Uso
 
+### 1. Configuración
+
 ```bash
-cp .env.example .env     # editar POSTGRES_PASSWORD
-docker compose build
-docker compose up
+cp .env.example .env        # Windows: copy .env.example .env
 ```
 
-`processor` es un job de un solo uso: corre el pipeline completo (NER ->
-clustering -> STIX), escribe en `output_data` y termina. `api` espera a que
-termine (`service_completed_successfully`) y luego sirve los bundles en
-http://localhost:8000.
+Edita `.env` y define **obligatoriamente**:
+
+| Variable | Para qué |
+|---|---|
+| `POSTGRES_PASSWORD` | Contraseña de la base de datos |
+| `TOR_CONTROL_PASSWORD` | Contraseña del ControlPort de Tor (rotación de circuitos con `stem`) |
+
+Si alguna está vacía o falta, `docker compose` **se niega a arrancar**, a
+propósito. `POSTGRES_PASSWORD` solo se aplica al crear la base: para
+cambiarla después hay que recrear el volumen (`docker compose down -v`).
+
+### 2. Build
 
 ```bash
-curl localhost:8000/stats
+docker compose build        # la primera vez tarda 10-20 min (torch + modelo)
+```
+
+### 3. Pipeline + API sobre el dataset sintético
+
+```bash
+docker compose up -d api               # arranca db, ejecuta processor y luego api
+docker compose logs processor          # debe terminar en "Pipeline completado"
+```
+
+API en http://localhost:8000 — documentación interactiva en
+http://localhost:8000/docs.
+
+```bash
+curl localhost:8000/stats              # Windows (PowerShell): curl.exe localhost:8000/stats
 curl localhost:8000/stix/bundles
-curl -X POST localhost:8000/iocs/extract \
-     -H 'Content-Type: application/json' \
-     -d '{"texto":"C2 en 198[.]51[.]100[.]42 explotando CVE-2024-1234"}'
 ```
 
-Verificar el aislamiento de red (util para la demo):
+Para `POST /iocs/extract` es más cómodo usar `/docs` → *Try it out*:
+
+```json
+{"texto": "C2 en 198[.]51[.]100[.]42 explotando CVE-2024-1234"}
+```
+
+### 4. Scraping vía Tor (hidden service propio)
+
+Ver [SAFE_TESTING.md](SAFE_TESTING.md), Etapa 1. Resumen en PowerShell:
+
+```powershell
+docker compose --profile testing up -d --build test-onion tor-proxy
+$ONION = (docker compose exec -T test-onion cat /var/lib/tor/test_service/hostname).Trim()
+docker compose --profile testing run --rm -e "SCRAPER_TARGET_URL=http://$ONION/post1.html,http://$ONION/post2.html,http://$ONION/post3.html,http://$ONION/post4.html" scraper
+docker compose run --rm processor      # ahora procesa data/raw en vez del sintético
+docker compose --profile testing down  # no dejar el hidden service corriendo
+```
+
+En bash, la segunda línea es:
+`ONION=$(docker compose exec -T test-onion cat /var/lib/tor/test_service/hostname | tr -d '\r\n')`
+
+Volver al dataset sintético (vacía el volumen `raw_data`):
 
 ```bash
-# El scraper NO puede alcanzar la base de datos:
-docker compose run --rm scraper python -c \
-  "import socket;socket.create_connection(('db',5432),3)"   # falla
-
-# Tor si esta enrutando:
-docker compose exec tor-proxy \
-  curl -s --socks5-hostname localhost:9050 https://check.torproject.org/api/ip
+docker compose run --rm --entrypoint sh scraper -c "rm -f /app/data/raw/*.json"
 ```
 
-Re-ejecutar solo el pipeline: `docker compose run --rm processor`.
+### Re-ejecutar solo el pipeline
+
+```bash
+docker compose run --rm processor
+```
+
+La API lee los bundles en cada petición: no hace falta reiniciarla.
+
+### Después de cambiar código
+
+El código se copia dentro de las imágenes (no se monta), así que hay que
+reconstruir la imagen afectada:
+
+| Si cambias… | Reconstruye |
+|---|---|
+| `src/darkintel/ner/` | `docker compose build processor api` |
+| `src/darkintel/scraper/` | `docker compose build scraper` |
+| `src/darkintel/clustering/`, `stix_builder/`, `data_loader.py`, `pipeline/` | `docker compose build processor` |
+| `api/` | `docker compose build api` |
+| `docker/torrc`, `Dockerfile.tor`, `tor-entrypoint.sh` | `docker compose build tor-proxy` |
+
+## Verificar el aislamiento (útil para la demo)
+
+```bash
+# 1. El scraper NO tiene internet directo (debe FALLAR):
+docker compose run --rm --entrypoint python scraper -c "import requests; requests.get('https://example.com', timeout=5)"
+
+# 2. El scraper NO alcanza la base de datos (debe FALLAR):
+docker compose run --rm --entrypoint python scraper -c "import socket; socket.create_connection(('db', 5432), 3)"
+
+# 3. Tor sí enruta (debe devolver "IsTor":true):
+docker compose exec tor-proxy curl -s --socks5-hostname localhost:9050 https://check.torproject.org/api/ip
+
+# 4. Sin contraseñas, el stack no arranca (debe FALLAR con un mensaje claro):
+#    comentar TOR_CONTROL_PASSWORD en .env y ejecutar:
+docker compose up -d tor-proxy
+```
+
+## Comportamiento del scraper
+
+| Mecanismo | Detalle |
+|---|---|
+| Rotación de circuitos | `NEWNYM` vía `stem` antes de cada objetivo, con un mínimo real de 10 s entre señales (límite de Tor). |
+| Tamaño máximo | 5 MB por respuesta; si se supera, se descarta. |
+| Tiempo máximo | 90 s por operación de red y **120 s totales** por descarga (protege contra servidores que envían datos muy despacio a propósito). |
+| Redirecciones | Seguidas a mano: máximo 3, solo hacia `.onion` y solo `http`/`https`. |
+| Reintentos | Solo ante fallos de red transitorios: 2 reintentos con circuito nuevo y espera de 5 s y 10 s. Los fallos de política (tamaño, tiempo, redirección) no se reintentan. |
 
 ## Estado de cada servicio
 
 | Servicio | Estado |
 |---|---|
-| `api` | Funcional. Sirve los bundles generados. |
-| `processor` | Funcional sobre `data/synthetic_darkweb_dump.json` (datos sinteticos, no scrapeados). |
-| `scraper` | Funcional: enruta por `TOR_SOCKS_PROXY` (`socks5h://`), rota circuitos con `stem`/`NEWNYM`, timeout 90s y limite de tamano de respuesta. Objetivo controlado por `SCRAPER_TARGET_URL` (ver `SAFE_TESTING.md`). |
-| `tor-proxy` | Daemon real y funcional, con `ControlPort` autenticado; ahora consumido por `scraper`. |
-| `test-onion` | Hidden service propio para pruebas (perfil `testing`, no se levanta en `up` normal). Ver `SAFE_TESTING.md` Etapa 1. |
-| `db` | Levanta con el esquema de `docker/postgres/init.sql`, pero el codigo sigue guardando JSON plano — pendiente para una siguiente iteracion. |
+| `tor-proxy` | Funcional. SOCKS5 y ControlPort autenticado, hash generado al arrancar. |
+| `scraper` | Funcional vía Tor con las protecciones de la tabla anterior. Recolecta las URLs de `SCRAPER_TARGET_URL`; todavía no descubre enlaces por sí mismo (no hay crawling). |
+| `test-onion` | Hidden service propio para pruebas (perfil `testing`). |
+| `processor` | Funcional: valida `data/raw`, extrae IoCs con regex, agrupa con embeddings + UMAP + HDBSCAN y genera bundles STIX 2.1. Usa `data/raw` si tiene posts; si no, el dataset sintético. |
+| `api` | Funcional. Sirve los bundles generados y extrae IoCs en vivo. |
+| `db` | Arranca con el esquema de `docker/postgres/init.sql` (pgvector), pero el pipeline todavía guarda en JSON: **pendiente**. |
+
+### Pendiente (siguiente iteración)
+
+- NER con Transformer (SecureBERT/DarkBERT) para malware, actores y herramientas.
+- Persistencia en PostgreSQL + pgvector.
+- Enriquecimiento (VirusTotal, AbuseIPDB, OTX, WHOIS) y reportes con RAG.
 
 ## Antes de correr el scraper contra un objetivo real
 
-**No lo pruebes directo contra dark web real.** Sigue el orden de
+**No lo pruebes directo contra la dark web real.** Sigue el orden de
 [SAFE_TESTING.md](SAFE_TESTING.md): unitarios sin red → hidden service
-propio (riesgo cero) → `.onion` legitimo conocido → objetivo real, y solo
+propio (riesgo cero) → `.onion` legítimo conocido → objetivo real, y solo
 en una VM desechable, nunca en un equipo personal.
+
+Las salidas del pipeline (`data/raw/`, `data/output/`, `clusters.png`)
+**nunca se versionan**: con datos reales contienen inteligencia sobre
+objetivos y campañas.

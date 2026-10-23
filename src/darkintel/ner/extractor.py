@@ -89,8 +89,7 @@ def normalizar_texto(texto: str) -> str:
     # hxxp/hxxps → http/https
     texto = re.sub(r"hxxps?", "http", texto, flags=re.IGNORECASE)
 
-    # SHA256 partido en dos líneas: unir líneas que terminen en hex
-        # SHA256 partido en dos líneas (ver _unir_hash_partido)
+    # SHA256 partido en dos líneas (ver _unir_hash_partido)
     texto = _HEX_PARTIDO.sub(_unir_hash_partido, texto)
 
     # Eliminar zero-width characters (ofuscación invisible)

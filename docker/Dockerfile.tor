@@ -1,8 +1,6 @@
 # DarkIntel — proxy Tor (red: darknet)
 #
-# PLACEHOLDER FUNCIONAL: el daemon Tor corre y expone SOCKS5 en :9050 dentro
-# de la red darknet, pero el codigo del scraper todavia NO lo usa
-# (fetcher.py sigue haciendo requests.get() plano). Ver README-docker.md.
+# Recolecta las URLs de SCRAPER_TARGET_URL vía Tor (ver SAFE_TESTING.md).
 FROM debian:bookworm-slim
 
 RUN apt-get update \

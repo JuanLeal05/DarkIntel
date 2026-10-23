@@ -27,15 +27,3 @@ def extraer_titulo(soup: BeautifulSoup) -> str:
     if tag_titulo is None:
         return ""
     return tag_titulo.get_text(strip=True)
-
-
-if __name__ == "__main__":
-    from darkintel.scraper.fetcher import obtener_html
-
-    url = "https://books.toscrape.com"
-    html = obtener_html(url)
-    soup = crear_soup(html)
-
-    print("Título:", extraer_titulo(soup))
-    print("Texto extraído (primeros 300 chars):")
-    print(extraer_texto_pagina(soup)[:300])
