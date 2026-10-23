@@ -1,6 +1,7 @@
 import os
 import socket
 import time
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -28,6 +29,17 @@ TIMEOUT_TOR = 90
 # confiable: evita que una respuesta gigante o una zip-bomb agote memoria/disco.
 MAX_BYTES_RESPUESTA = 5 * 1024 * 1024  # 5 MB
 
+# Tiempo MAXIMO total por descarga (conexion + redirecciones + cuerpo).
+# TIMEOUT_TOR es por operacion de red y se reinicia con cada byte recibido:
+# un servidor hostil que manda 1 byte cada 80 s nunca lo dispararia
+# (slowloris). Este limite si corta.
+TIEMPO_TOTAL_MAX = 120
+
+# Redirecciones: se siguen a mano, como maximo estas, y solo hacia .onion
+# cuando se usa Tor (ver _validar_redireccion).
+MAX_REDIRECCIONES = 3
+CODIGOS_REDIRECCION = (301, 302, 303, 307, 308)
+
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/128.0"
 
 
@@ -51,6 +63,11 @@ def _proxies() -> dict:
     return {"http": TOR_SOCKS_PROXY, "https": TOR_SOCKS_PROXY}
 
 
+# Tor ignora (aplaza) un NEWNYM si llega antes de 10 s desde el anterior.
+INTERVALO_NEWNYM = 10
+_ultimo_newnym = float("-inf")   # instante (monotonic) del ultimo NEWNYM enviado
+
+
 def renovar_circuito() -> bool:
     """
     Pide a Tor un circuito nuevo (NEWNYM) vía el ControlPort usando stem.
@@ -70,17 +87,46 @@ def renovar_circuito() -> bool:
         direccion = socket.gethostbyname(TOR_CONTROL_HOST)
         with Controller.from_port(address=direccion, port=TOR_CONTROL_PORT) as controlador:
             controlador.authenticate(password=TOR_CONTROL_PASSWORD)
-            espera = controlador.get_newnym_wait()   # segundos hasta que Tor acepte otro NEWNYM
+            # Tor solo respeta un NEWNYM cada 10 s. OJO: stem tiene
+            # get_newnym_wait(), pero solo recuerda los NEWNYM enviados por
+            # ESE objeto Controller, y aqui se abre uno nuevo en cada llamada,
+            # asi que siempre devolveria 0. Por eso el registro es global.
+            global _ultimo_newnym
+            espera = INTERVALO_NEWNYM - (time.monotonic() - _ultimo_newnym)
             if espera > 0:
                 time.sleep(espera)
             controlador.signal(Signal.NEWNYM)
+            _ultimo_newnym = time.monotonic()
         return True
     except Exception as error:
         print(f"⚠️  No se pudo renovar el circuito Tor: {error}")
         return False
 
 
-def obtener_html(url: str, usar_tor: bool = True, timeout: int = None) -> str:
+def _es_onion(url: str) -> bool:
+    return (urlparse(url).hostname or "").lower().endswith(".onion")
+
+
+def _validar_redireccion(origen: str, destino: str, usar_tor: bool) -> None:
+    """
+    Lanza ValueError si la redireccion no es aceptable.
+
+    Un .onion hostil puede responder 302 hacia un dominio de clearnet que
+    controla: aunque el trafico siga yendo por Tor, le confirma que lo
+    visitamos y nos saca del entorno .onion. Por eso, con Tor solo se
+    aceptan destinos .onion; sin Tor (pruebas locales), solo el mismo host.
+    """
+    esquema = urlparse(destino).scheme
+    if esquema not in ("http", "https"):
+        raise ValueError(f"Redireccion con esquema no permitido: {destino!r}")
+    if usar_tor and not _es_onion(destino):
+        raise ValueError(f"Redireccion fuera de .onion bloqueada: {origen} -> {destino}")
+    if not usar_tor and urlparse(destino).hostname != urlparse(origen).hostname:
+        raise ValueError(f"Redireccion a otro host bloqueada: {origen} -> {destino}")
+
+
+def obtener_html(url: str, usar_tor: bool = True, timeout: int = None,
+                 tiempo_total: float = None) -> str:
     """
     Descarga el HTML crudo de una URL.
 
@@ -89,22 +135,41 @@ def obtener_html(url: str, usar_tor: bool = True, timeout: int = None) -> str:
 
     usar_tor=False existe solo para pruebas locales controladas (ver
     SAFE_TESTING.md) contra objetivos que deliberadamente no requieren Tor.
-    Nunca debe usarse contra un dominio .onion: un .onion no resuelve fuera
-    de la red Tor, así que esa combinación simplemente fallará por diseño.
 
-    Lanza una excepción si la petición falla o si la respuesta excede
-    MAX_BYTES_RESPUESTA.
+    Defensas frente a un servidor hostil:
+      - limite de tamano (MAX_BYTES_RESPUESTA)
+      - limite de tiempo total (TIEMPO_TOTAL_MAX), no solo por operacion
+      - redirecciones seguidas a mano: maximo MAX_REDIRECCIONES y solo
+        hacia .onion cuando se usa Tor
+
+    Lanza ValueError (tamano, redireccion) o TimeoutError (tiempo total).
     """
     timeout = timeout or (TIMEOUT_TOR if usar_tor else 10)
+    limite = time.monotonic() + (tiempo_total or TIEMPO_TOTAL_MAX)
+
     kwargs = {
         "timeout": timeout,
         "headers": {"User-Agent": USER_AGENT},
-        "stream": True,   # necesario para poder cortar por tamaño
+        "stream": True,            # necesario para poder cortar por tamano/tiempo
+        "allow_redirects": False,  # las redirecciones se validan a mano abajo
     }
     if usar_tor:
         kwargs["proxies"] = _proxies()
 
-    respuesta = requests.get(url, **kwargs)
+    actual = url
+    for _ in range(MAX_REDIRECCIONES + 1):
+        respuesta = requests.get(actual, **kwargs)
+        if respuesta.status_code not in CODIGOS_REDIRECCION:
+            break
+        destino = urljoin(actual, respuesta.headers.get("Location", ""))
+        respuesta.close()
+        _validar_redireccion(actual, destino, usar_tor)
+        if time.monotonic() > limite:
+            raise TimeoutError(f"{url}: tiempo total agotado durante redirecciones")
+        actual = destino
+    else:
+        raise ValueError(f"{url}: mas de {MAX_REDIRECCIONES} redirecciones")
+
     respuesta.raise_for_status()
 
     contenido = bytearray()
@@ -113,11 +178,46 @@ def obtener_html(url: str, usar_tor: bool = True, timeout: int = None) -> str:
         if len(contenido) > MAX_BYTES_RESPUESTA:
             respuesta.close()
             raise ValueError(
-                f"Respuesta de {url} supera el límite de "
+                f"Respuesta de {url} supera el limite de "
                 f"{MAX_BYTES_RESPUESTA} bytes; descartada por seguridad."
+            )
+        if time.monotonic() > limite:
+            respuesta.close()
+            raise TimeoutError(
+                f"{url}: se supero el tiempo total de descarga; "
+                f"posible servidor lento a proposito (slowloris)."
             )
 
     return contenido.decode(respuesta.encoding or "utf-8", errors="replace")
+
+
+# Reintentos solo para fallos de RED transitorios (circuito .onion que no
+# se arma, timeout de conexion). Nunca para fallos de POLITICA: tamano,
+# tiempo total, redireccion bloqueada o un HTTP 4xx/5xx del servidor.
+REINTENTOS_RED = 2
+ESPERA_BASE_REINTENTO = 5   # segundos; se duplica en cada reintento
+
+
+def obtener_html_con_reintentos(url: str, reintentos: int = REINTENTOS_RED) -> str:
+    """
+    Envuelve obtener_html(usar_tor=True) con reintentos ante errores de red.
+
+    Los servicios .onion fallan a menudo de forma transitoria: armar el
+    circuito de rendezvous puede no completarse a tiempo. Antes de cada
+    reintento se pide un circuito nuevo y se espera con backoff exponencial.
+    """
+    for intento in range(reintentos + 1):
+        try:
+            return obtener_html(url, usar_tor=True)
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as error:
+            if intento == reintentos:
+                raise
+            espera = ESPERA_BASE_REINTENTO * (2 ** intento)
+            print(f"   ↻ Error de red ({type(error).__name__}); reintento "
+                  f"{intento + 1}/{reintentos} en {espera}s con circuito nuevo")
+            time.sleep(espera)
+            renovar_circuito()
 
 
 if __name__ == "__main__":
@@ -147,7 +247,7 @@ if __name__ == "__main__":
             print("   🔄 Circuito Tor renovado (NEWNYM)")
 
         try:
-            html = obtener_html(url, usar_tor=True)
+            html = obtener_html_con_reintentos(url)
         except Exception as error:
             # Un objetivo caído no debe tumbar el resto del rastreo.
             print(f"   ❌ Falló: {type(error).__name__}: {error}")
