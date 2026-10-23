@@ -46,6 +46,35 @@ PATTERNS = {
 
 # ── Pre-procesamiento ───────────────────────────────────────
 
+# Un SHA256 partido en dos líneas: primera parte de 16-63 hex, segunda de 1-48.
+# Los \b evitan cortar un hash más largo; \r? cubre textos con fin de línea Windows.
+_HEX_PARTIDO = re.compile(
+    r"\b([a-fA-F0-9]{16,63})[ \t]*\r?\n[ \t]*([a-fA-F0-9]{1,48})\b"
+)
+_PALABRA_SHA256 = re.compile(r"sha[-_ ]?256", re.IGNORECASE)
+
+
+def _unir_hash_partido(m: re.Match) -> str:
+    """
+    Decide si dos líneas hex consecutivas son UN SHA256 partido o dos
+    hashes distintos.
+
+    - Si no suman 64 caracteres, no pueden ser un SHA256: se dejan igual.
+    - 32 + 32 es ambiguo: puede ser un SHA256 cortado a la mitad o dos MD5
+      seguidos (muy común en listas de foros). Solo se unen si el contexto
+      previo menciona "sha256"; si no, se asume que son dos MD5.
+    - Cualquier otro corte que sume 64 (p. ej. 40 + 24) no puede ser un par
+      de MD5, así que se une.
+    """
+    a, b = m.group(1), m.group(2)
+    if len(a) + len(b) != 64:
+        return m.group(0)
+    if len(a) == 32 and len(b) == 32:
+        contexto = m.string[max(0, m.start() - 40):m.start()]
+        if not _PALABRA_SHA256.search(contexto):
+            return m.group(0)
+    return a + b
+
 def normalizar_texto(texto: str) -> str:
     """
     Normaliza técnicas de ofuscación comunes en foros dark web
@@ -61,11 +90,8 @@ def normalizar_texto(texto: str) -> str:
     texto = re.sub(r"hxxps?", "http", texto, flags=re.IGNORECASE)
 
     # SHA256 partido en dos líneas: unir líneas que terminen en hex
-    texto = re.sub(
-        r"([a-fA-F0-9]{16,})\n([a-fA-F0-9]{16,})",
-        r"\1\2",
-        texto
-    )
+        # SHA256 partido en dos líneas (ver _unir_hash_partido)
+    texto = _HEX_PARTIDO.sub(_unir_hash_partido, texto)
 
     # Eliminar zero-width characters (ofuscación invisible)
     texto = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", texto)

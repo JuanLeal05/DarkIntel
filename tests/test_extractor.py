@@ -131,7 +131,7 @@ def test_sha256_en_lista():
 
 
 def test_sha256_partido_en_dos_lineas():
-    texto = "hash: e3b0c44298fc1c149afbf4c8996fb924\n27ae41e4649b934ca495991b7852b856"
+    texto = "sha256: e3b0c44298fc1c149afbf4c8996fb924\n27ae41e4649b934ca495991b7852b856"
     resultado = extraer_iocs(texto)
     assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b856" in resultado["sha256"]
     print("✅ test_sha256_partido_en_dos_lineas superado")
@@ -180,6 +180,37 @@ def test_md5_con_asteriscos_foro():
 
 
 # ── Tests de CVE ─────────────────────────────────────────────
+
+def test_dos_md5_en_lineas_consecutivas_no_se_fusionan():
+    texto = "5f4dcc3b5aa765d61d8327deb882cf99\n098f6bcd4621d373cade4e832627b4f6"
+    resultado = extraer_iocs(texto)
+    assert "5f4dcc3b5aa765d61d8327deb882cf99" in resultado["md5"]
+    assert "098f6bcd4621d373cade4e832627b4f6" in resultado["md5"]
+    assert resultado["sha256"] == []
+
+
+def test_md5_consecutivos_con_fin_de_linea_windows():
+    texto = "5f4dcc3b5aa765d61d8327deb882cf99\r\n098f6bcd4621d373cade4e832627b4f6"
+    resultado = extraer_iocs(texto)
+    assert len(resultado["md5"]) == 2
+    assert resultado["sha256"] == []
+
+
+def test_lista_de_tres_md5_no_se_fusiona():
+    texto = ("hashes del loader:\n"
+             "5f4dcc3b5aa765d61d8327deb882cf99\n"
+             "098f6bcd4621d373cade4e832627b4f6\n"
+             "5d41402abc4b2a76b9719d911017c592")
+    resultado = extraer_iocs(texto)
+    assert len(resultado["md5"]) == 3
+    assert resultado["sha256"] == []
+
+
+def test_sha256_partido_asimetrico_se_une_sin_palabra_clave():
+    # 40 + 24 = 64: no puede ser un par de MD5, así que es un SHA256 partido
+    texto = "hash: a7ffc6f8bf1ed76651c14756a061d662f580ff4d\ne43b49fa82d80a4b80f8434a"
+    resultado = extraer_iocs(texto)
+    assert "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a" in resultado["sha256"]
 
 def test_cve_se_normaliza_a_mayusculas():
     texto = "vulnerabilidad cve-2024-1234 explotada activamente"
