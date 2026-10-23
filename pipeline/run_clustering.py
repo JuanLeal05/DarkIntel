@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from darkintel.ner.extractor import extraer_iocs
+from darkintel.ner.hibrido import extraer
 from darkintel.clustering.embedder import generar_embeddings
 from darkintel.clustering.cluster import reducir_dimensiones, clustering
 from darkintel.data_loader import cargar_posts
@@ -28,16 +28,18 @@ def run():
         print("    Scrapea más páginas y vuelve a correr.")
         return
 
-    # Extraer IoCs de cada post y combinarlos con el texto
+    # Extraer IoCs y entidades de cada post y combinarlos con el texto:
+    # dos posts que nombran el mismo malware o el mismo C2 quedan más cerca.
     textos = []
     for post in posts:
-        iocs = extraer_iocs(post["text"])
-        iocs_str = " ".join(
-            ioc
-            for tipo in iocs.values()
-            for ioc in tipo
+        resultado = extraer(post["text"])
+        senales = " ".join(
+            valor
+            for grupo in ("iocs", "entidades")
+            for valores in resultado[grupo].values()
+            for valor in valores
         )
-        textos.append(post["text"] + " " + iocs_str)
+        textos.append(post["text"] + " " + senales)
 
     # Generar embeddings
     print("🔢 Generando embeddings...")

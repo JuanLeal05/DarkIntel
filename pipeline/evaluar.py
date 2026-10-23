@@ -5,8 +5,8 @@ Uso típico:
     # Durante el desarrollo: SOLO el conjunto dev
     python pipeline/evaluar.py
 
-    # Comparar solo regex vs. híbrido (regex + Transformer)
-    python pipeline/evaluar.py --modo ambos
+    # Cuánto aporta cada capa (regex / +diccionario / +Transformer / todo)
+    python pipeline/evaluar.py --modo todos
 
     # Acuerdo entre los dos anotadores (antes de crear anotaciones_final)
     python pipeline/evaluar.py --acuerdo anotaciones_A.jsonl anotaciones_B.jsonl
@@ -38,15 +38,26 @@ ORDEN_FILAS = ([f"iocs.{t}" for t in TIPOS_IOC] + ["iocs_total"]
 
 # ── Predicción del sistema ──────────────────────────────────
 
+# modo -> (Transformer activo, base de conocimiento activa)
+MODOS = {
+    "regex":       (False, False),   # solo reglas: la línea base
+    "kb":          (False, True),    # regex + diccionario de entidades conocidas
+    "transformer": (True,  False),   # regex + SecureBERT-NER, sin corrección
+    "hibrido":     (True,  True),    # sistema completo
+}
+
+
 def predecir(posts: dict, post_ids: list, modo: str) -> tuple[dict, float]:
     """
-    Ejecuta el NER sobre cada post. modo: 'regex' o 'hibrido'.
+    Ejecuta el NER sobre cada post con la configuración de MODOS[modo].
     Devuelve (predicciones, segundos_totales).
     """
-    os.environ["DARKINTEL_NER_TRANSFORMER"] = "1" if modo == "hibrido" else "0"
+    usa_transformer, usa_kb = MODOS[modo]
+    os.environ["DARKINTEL_NER_TRANSFORMER"] = "1" if usa_transformer else "0"
+    os.environ["DARKINTEL_NER_KB"] = "1" if usa_kb else "0"
     from darkintel.ner.hibrido import extraer
 
-    if modo == "hibrido":
+    if usa_transformer:
         extraer("warm up")   # carga el modelo fuera del cronómetro
 
     predicciones = {}
@@ -111,7 +122,7 @@ def main() -> int:
     parser.add_argument("--final", action="store_true",
                         help="obligatorio para evaluar el split test")
     parser.add_argument("--referencia", default="anotaciones_final.jsonl")
-    parser.add_argument("--modo", choices=("regex", "hibrido", "ambos"), default="ambos")
+    parser.add_argument("--modo", choices=(*MODOS, "todos"), default="todos")
     parser.add_argument("--acuerdo", nargs=2, metavar=("A", "B"),
                         help="compara dos archivos de anotaciones entre sí")
     parser.add_argument("--salida", help="guardar resultados en este JSON")
@@ -160,7 +171,7 @@ def main() -> int:
     post_ids = sorted(pid for pid, p in posts.items() if p["split"] == args.split)
     print(f"📂 {len(post_ids)} posts del split '{args.split}' — referencia: {args.referencia}")
 
-    modos = ("regex", "hibrido") if args.modo == "ambos" else (args.modo,)
+    modos = tuple(MODOS) if args.modo == "todos" else (args.modo,)
     resultados = {}
     for modo in modos:
         pred, segundos = predecir(posts, post_ids, modo)
@@ -168,11 +179,14 @@ def main() -> int:
         resultados[modo] = {"metricas": metricas, "segundos": round(segundos, 3)}
         imprimir_tabla(f"Modo '{modo}'  ({segundos:.2f} s para {len(post_ids)} posts)", metricas)
 
-    if len(modos) == 2:
-        g_r = resultados["regex"]["metricas"]["global"]
-        g_h = resultados["hibrido"]["metricas"]["global"]
-        print(f"\nAporte del Transformer (global): F1 {g_r['f1']*100:.1f}% → {g_h['f1']*100:.1f}%, "
-              f"precisión {g_r['precision']*100:.1f}% → {g_h['precision']*100:.1f}%")
+    if len(modos) > 1:
+        print("\nResumen (global = IoCs + entidades)")
+        print(f"  {'modo':12s} {'P':>6s} {'R':>6s} {'F1':>6s}   {'entidades F1':>12s}   {'tiempo':>7s}")
+        for modo in modos:
+            m = resultados[modo]["metricas"]
+            g, e = m["global"], m["entidades_total"]
+            print(f"  {modo:12s} {g['precision']*100:5.1f}% {g['recall']*100:5.1f}% "
+                  f"{g['f1']*100:5.1f}%   {e['f1']*100:11.1f}%   {resultados[modo]['segundos']:6.2f}s")
 
     manuales = minutos_manuales(os.path.join(args.dir, "tiempos.csv"), args.split)
     if manuales:

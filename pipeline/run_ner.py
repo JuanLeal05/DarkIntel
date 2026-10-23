@@ -3,8 +3,17 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from darkintel.ner.extractor import extraer_iocs
+from darkintel.ner.hibrido import conocimiento_activo, extraer, transformer_activo
 from darkintel.data_loader import cargar_posts
+
+
+def describir_ner() -> str:
+    partes = ["regex"]
+    if transformer_activo():
+        partes.append("Transformer")
+    if conocimiento_activo():
+        partes.append("base de conocimiento")
+    return " + ".join(partes)
 
 
 def evaluar_post(detectado: dict, esperado: dict) -> dict:
@@ -60,14 +69,17 @@ def calcular_metricas(tp: int, fp: int, fn: int) -> dict:
 def run():
     posts, es_sintetico = cargar_posts()
     fuente = "synthetic_darkweb_dump.json" if es_sintetico else "data/raw (scraper real)"
-    print(f"📂 Cargados {len(posts)} posts — fuente: {fuente}\n")
+    print(f"📂 Cargados {len(posts)} posts — fuente: {fuente}")
+    print(f"🧠 NER: {describir_ner()}\n")
 
     tp_total, fp_total, fn_total = 0, 0, 0
 
     for post in posts:
-        iocs = extraer_iocs(post["text"])
+        resultado = extraer(post["text"])
+        iocs = resultado["iocs"]
         print(f"[{post['post_id']}]")
-        print(f"  Detectado: { {k: v for k, v in iocs.items() if v} }")
+        print(f"  IoCs:      { {k: v for k, v in iocs.items() if v} }")
+        print(f"  Entidades: { {k: v for k, v in resultado['entidades'].items() if v} }")
 
         if post.get("labels_manual") is not None:
             metricas = evaluar_post(iocs, post["labels_manual"])

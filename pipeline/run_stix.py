@@ -4,7 +4,7 @@ import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from darkintel.ner.extractor import extraer_iocs
+from darkintel.ner.hibrido import CATEGORIAS_ENTIDAD, extraer
 from darkintel.clustering.embedder import generar_embeddings
 from darkintel.clustering.cluster import reducir_dimensiones, clustering
 from darkintel.stix_builder.builder import construir_bundle
@@ -30,17 +30,22 @@ def run():
         print("    Scrapea más páginas y vuelve a correr.")
         return
 
-    # 1. Extraer IoCs
-    print("🔍 Extrayendo IoCs...")
-    iocs_por_post = [extraer_iocs(p["text"]) for p in posts]
+    # 1. Extraer IoCs (regex) y entidades (Transformer + base de conocimiento)
+    print("🔍 Extrayendo IoCs y entidades...")
+    extraidos = [extraer(p["text"]) for p in posts]
+    iocs_por_post = [r["iocs"] for r in extraidos]
+    entidades_por_post = [r["entidades"] for r in extraidos]
 
     # 2. Clustering
     print("🔢 Generando embeddings...")
     textos = [
         p["text"] + " " + " ".join(
-            ioc for tipo in iocs.values() for ioc in tipo
+            valor
+            for grupo in (iocs, entidades)
+            for valores in grupo.values()
+            for valor in valores
         )
-        for p, iocs in zip(posts, iocs_por_post)
+        for p, iocs, entidades in zip(posts, iocs_por_post, entidades_por_post)
     ]
     embeddings = generar_embeddings(textos)
     embeddings_2d = reducir_dimensiones(embeddings)
@@ -66,6 +71,16 @@ def run():
                 set(iocs_por_cluster[label][tipo])
             )
 
+    # Entidades por cluster (sin duplicados, conservando el orden)
+    entidades_por_cluster = {}
+    for entidades, label in zip(entidades_por_post, labels):
+        destino = entidades_por_cluster.setdefault(
+            int(label), {c: [] for c in CATEGORIAS_ENTIDAD})
+        for categoria, nombres in entidades.items():
+            for nombre in nombres:
+                if nombre not in destino[categoria]:
+                    destino[categoria].append(nombre)
+
     # 4. Construir bundles STIX
     bundles = {}
     for cluster_id, iocs in sorted(iocs_por_cluster.items()):
@@ -76,6 +91,9 @@ def run():
         n_objetos = len(bundle_dict.get("objects", []))
         nombre = f"Cluster {cluster_id}" if cluster_id >= 0 else "Ruido"
         print(f"  {nombre}: {n_objetos} objetos STIX")
+        resumen = {c: v for c, v in entidades_por_cluster.get(cluster_id, {}).items() if v}
+        if resumen:
+            print(f"      entidades: {resumen}")
 
     # 5. Guardar resultado
     ruta = guardar_json(bundles, carpeta="data/output",

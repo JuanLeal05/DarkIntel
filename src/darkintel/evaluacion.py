@@ -10,6 +10,8 @@ import ipaddress
 import json
 import re
 
+from darkintel.ner.conocimiento import canonicalizar
+
 # ── Esquema ─────────────────────────────────────────────────
 
 TIPOS_IOC = ("ip", "ipv6", "md5", "sha1", "sha256", "cve", "dominio")
@@ -218,6 +220,16 @@ def _conjunto(valores) -> set:
     return {v.strip().lower() for v in valores if v and v.strip()}
 
 
+def _conjunto_entidades(valores) -> set:
+    """
+    Las entidades se comparan por su nombre CANÓNICO: la guía pide anotar
+    los alias tal como aparecen ("mimi", regla 4.2.5) y el sistema los
+    devuelve canonicalizados ("Mimikatz"). Aplicar la misma tabla a los dos
+    lados hace que eso no cuente como error.
+    """
+    return {canonicalizar(v).lower() for v in valores if v and v.strip()}
+
+
 def prf(tp: int, fp: int, fn: int) -> dict:
     p = tp / (tp + fp) if tp + fp else 0.0
     r = tp / (tp + fn) if tp + fn else 0.0
@@ -250,9 +262,10 @@ def comparar(referencia: dict, prediccion: dict, post_ids) -> dict:
         det_ref, det_pred = set(), set()
         for grupo, tipos, total in (("iocs", TIPOS_IOC, "iocs_total"),
                                     ("entidades", TIPOS_ENTIDAD, "entidades_total")):
+            a_conjunto = _conjunto_entidades if grupo == "entidades" else _conjunto
             for tipo in tipos:
-                r = _conjunto(ref[grupo].get(tipo, []))
-                p = _conjunto(pred.get(grupo, {}).get(tipo, []))
+                r = a_conjunto(ref[grupo].get(tipo, []))
+                p = a_conjunto(pred.get(grupo, {}).get(tipo, []))
                 sumar(f"{grupo}.{tipo}", r, p)
                 sumar(total, {(tipo, v) for v in r}, {(tipo, v) for v in p})
                 sumar("global", {(tipo, v) for v in r}, {(tipo, v) for v in p})
