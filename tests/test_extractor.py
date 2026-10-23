@@ -327,6 +327,70 @@ def test_zero_width_characters_ignorados():
     print("✅ test_zero_width_characters_ignorados superado")
 
 
+# ── A4: mejoras de la auditoría ──────────────────────────────
+
+import pytest
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("see www.google.com and drive.google.com", []),                    # subdominios benignos
+    ("c2 at evil-panel.org and bad-host.de", ["evil-panel.org", "bad-host.de"]),  # TLDs nuevos
+    ("mail me@badsite.ru or visit badsite.ru", ["badsite.ru"]),          # email + aparición suelta
+    ("run setup.exe and read readme.info", []),                          # archivos
+    ("download install.sh and dump.zip", []),                            # extensiones = TLD real
+    ("but evil.info stays", ["evil.info"]),                              # .info legítimo como IoC
+    ("evil[dot]com and x(.)onion and y{.}cc", ["evil.com", "x.onion", "y.cc"]),  # defang
+    ("hxxps[:]//panel-demo[.]cc:8080/gate.php", ["panel-demo.cc"]),
+])
+def test_a4_dominios(texto, esperado):
+    assert extraer_iocs(texto)["dominio"] == esperado
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("192(dot)0(dot)2(dot)44", ["192.0.2.44"]),
+    ("100.64.1.1 198.18.0.1 224.0.0.1 0.0.0.0", []),     # CGNAT, benchmark, multicast, sin especificar
+    ("Firefox 115.0.2.1 and build 2.4.1.7", []),          # versiones con nombre de producto
+    ("C2 at 198.51.100.9 and 8.8.8.8", ["198.51.100.9", "8.8.8.8"]),
+])
+def test_a4_ipv4(texto, esperado):
+    assert extraer_iocs(texto)["ip"] == esperado
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("c2 2001:db8::1", ["2001:db8::1"]),                  # forma comprimida
+    ("full 2001:0DB8:0000:0000:0000:0000:0000:0001", ["2001:db8::1"]),  # se normaliza
+    ("iface 00:1a:2b:3c:4d:5e up", []),                   # MAC
+    ("at 12:30:45:00 utc", []),                           # hora
+    ("fe80::1 and ::1", []),                              # link-local y loopback
+])
+def test_a4_ipv6(texto, esperado):
+    assert extraer_iocs(texto)["ipv6"] == esperado
+
+
+def test_a4_sha1():
+    r = extraer_iocs("sha1 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12 "
+                     "empty da39a3ee5e6b4b0d3255bfef95601890afd80709")
+    assert r["sha1"] == ["2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"]
+    assert r["md5"] == [] and r["sha256"] == []
+
+
+def test_a4_siempre_devuelve_todas_las_claves():
+    assert set(extraer_iocs("nada")) == {"ip", "ipv6", "sha256", "sha1", "md5", "cve", "dominio"}
+
+
+def test_a4_orden_de_aparicion_estable():
+    # Antes se usaba set(): el orden cambiaba entre ejecuciones
+    texto = "c2 203.0.113.9 then 198.51.100.1 then 192.0.2.5"
+    assert extraer_iocs(texto)["ip"] == ["203.0.113.9", "198.51.100.1", "192.0.2.5"]
+
+
+def test_a4_ipv6_sin_redos():
+    import time
+    t = time.time()
+    extraer_iocs("a:" * 50000 + "!")
+    assert time.time() - t < 2
+
+
 if __name__ == "__main__":
     # Originales
     test_detecta_ip()
