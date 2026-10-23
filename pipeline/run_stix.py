@@ -62,7 +62,7 @@ def run():
                 "md5": [], "cve": [], "dominio": []
             }
         for tipo, valores in iocs.items():
-            iocs_por_cluster[label][tipo].extend(valores)
+            iocs_por_cluster[label].setdefault(tipo, []).extend(valores)
 
     # Eliminar duplicados
     for label in iocs_por_cluster:
@@ -81,10 +81,22 @@ def run():
                 if nombre not in destino[categoria]:
                     destino[categoria].append(nombre)
 
+    # Fechas por cluster: primer y último post (alimentan first_seen/last_seen)
+    fechas_por_cluster = {}
+    for post, label in zip(posts, labels):
+        if post.get("timestamp"):
+            fechas_por_cluster.setdefault(int(label), []).append(post["timestamp"])
+
     # 4. Construir bundles STIX
     bundles = {}
     for cluster_id, iocs in sorted(iocs_por_cluster.items()):
-        bundle = construir_bundle(iocs, cluster_id)
+        fechas = sorted(fechas_por_cluster.get(cluster_id, []))
+        bundle = construir_bundle(
+            iocs, cluster_id,
+            entidades=entidades_por_cluster.get(cluster_id),
+            primera_vista=fechas[0] if fechas else None,
+            ultima_vista=fechas[-1] if fechas else None,
+        )
         bundle_dict = json.loads(bundle.serialize())
         bundles[f"cluster_{cluster_id}"] = bundle_dict
 

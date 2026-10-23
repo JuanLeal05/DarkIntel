@@ -88,7 +88,7 @@ def test_labels_manual_inyectado_se_ignora(raw):
 def test_campos_desconocidos_no_se_copian(raw):
     _escribir(raw, "extra.json", {"text": "hola", "__class__": "x", "cmd": "rm -rf /"})
     posts, _ = dl.cargar_posts()
-    assert set(posts[0]) == {"post_id", "text", "url", "titulo", "source", "labels_manual"}
+    assert set(posts[0]) == {"post_id", "text", "url", "titulo", "source", "timestamp", "labels_manual"}
 
 
 def test_post_id_con_ruta_se_reemplaza(raw):

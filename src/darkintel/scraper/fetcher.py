@@ -1,6 +1,7 @@
 import os
 import socket
 import time
+from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -266,6 +267,8 @@ if __name__ == "__main__":
         post = {
             "source": "scraper_tor",
             "url": url,
+            # Hora de recolección: alimenta first_seen/valid_from en STIX
+            "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "titulo": titulo,
             "text": texto,
         }

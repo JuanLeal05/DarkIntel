@@ -25,6 +25,7 @@ viene de data/raw/ se usa sin validar:
 Lo inválido se descarta con un aviso; nunca tumba el pipeline.
 """
 import glob
+from datetime import datetime, timezone
 import json
 import os
 import re
@@ -62,10 +63,27 @@ class PostCrudo(BaseModel):
     url: Optional[str] = Field(default=None, max_length=2048)
     titulo: Optional[str] = Field(default=None, max_length=1000)
     source: Optional[str] = Field(default=None, max_length=100)
+    timestamp: Optional[str] = Field(default=None, max_length=40)
 
 
 def _avisar(ruta: str, motivo: str) -> None:
     print(f"⚠️  Descartado {os.path.basename(ruta)}: {motivo}")
+
+
+def _timestamp_seguro(propuesto: Optional[str], ruta: str) -> str:
+    """
+    Fecha del post en ISO 8601 UTC. Si el scraper no la trae o es inválida
+    (dato no confiable), se usa la fecha de modificación del archivo.
+    """
+    if propuesto:
+        try:
+            dt = datetime.fromisoformat(propuesto.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+        except ValueError:
+            pass
+    return datetime.fromtimestamp(os.path.getmtime(ruta), tz=timezone.utc).isoformat(timespec="seconds")
 
 
 def _post_id_seguro(propuesto: Optional[str], respaldo: str) -> str:
@@ -99,6 +117,7 @@ def _normalizar_post(datos: dict, origen_archivo: str, indice: int) -> Optional[
         "url": crudo.url,
         "titulo": crudo.titulo,
         "source": crudo.source,
+        "timestamp": _timestamp_seguro(crudo.timestamp, origen_archivo),
         "labels_manual": None,   # datos reales: nunca hay ground truth
     }
 

@@ -126,28 +126,29 @@ def estadisticas():
     """Resumen de la inteligencia disponible."""
     bundles = cargar_bundles()
 
-    total_objetos = 0
-    total_indicadores = 0
-    total_campanas = 0
-    total_vulnerabilidades = 0
-
+    por_tipo = {}
+    ids_vistos = set()
     for bundle in bundles.values():
-        objetos = bundle.get("objects", [])
-        total_objetos += len(objetos)
-        for obj in objetos:
+        for obj in bundle.get("objects", []):
+            # Los IDs son deterministas: el mismo malware en dos campañas es
+            # UN objeto. Se cuenta una sola vez.
+            obj_id = obj.get("id")
+            if obj_id is not None:
+                if obj_id in ids_vistos:
+                    continue
+                ids_vistos.add(obj_id)
             tipo = obj.get("type")
-            if tipo == "indicator":
-                total_indicadores += 1
-            elif tipo == "campaign":
-                total_campanas += 1
-            elif tipo == "vulnerability":
-                total_vulnerabilidades += 1
+            por_tipo[tipo] = por_tipo.get(tipo, 0) + 1
 
     return {
         # El ruido de HDBSCAN no es una campaña: no se cuenta.
         "campanas_detectadas": sum(1 for clave in bundles if clave != CLAVE_RUIDO),
-        "total_objetos_stix": total_objetos,
-        "indicadores": total_indicadores,
-        "campanas": total_campanas,
-        "vulnerabilidades": total_vulnerabilidades
+        "total_objetos_stix": sum(por_tipo.values()),
+        "indicadores": por_tipo.get("indicator", 0),
+        "campanas": por_tipo.get("campaign", 0),
+        "vulnerabilidades": por_tipo.get("vulnerability", 0),
+        "malware": por_tipo.get("malware", 0),
+        "herramientas": por_tipo.get("tool", 0),
+        "actores": por_tipo.get("threat-actor", 0),
+        "tecnicas": por_tipo.get("attack-pattern", 0),
     }
