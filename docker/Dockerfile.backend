@@ -28,6 +28,13 @@ RUN apt-get update \
 # embedder.py vuelva a bajar ~90MB en cada ejecucion.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
+# Modelo NER (SecureBERT-NER, ~500 MB), fijado a un commit concreto. Solo se
+# bajan los archivos necesarios para inferencia: el repo trae ademas
+# optimizer.pt y pytorch_model.bin (~1.5 GB) que no hacen falta.
+ARG NER_MODEL=CyberPeace-Institute/SecureBERT-NER
+ARG NER_REVISION=7f935a4f7db13697580c881e381bb2636dfa779a
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('${NER_MODEL}', revision='${NER_REVISION}', allow_patterns=['config.json', 'model.safetensors', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'vocab.json', 'merges.txt'])"
+
 # Con el modelo ya en la imagen, se fuerza modo offline: sin esto la libreria
 # intenta contactar huggingface.co en cada arranque y, al no haber salida a
 # internet en la red `backend`, gasta ~60s en reintentos de DNS antes de
