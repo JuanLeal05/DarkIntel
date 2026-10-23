@@ -64,3 +64,67 @@ def test_muestra_grande_recupera_las_campanas():
 def test_proyeccion_2d_para_el_grafico():
     X, _ = _campanas()
     assert cl.proyeccion_2d(X).shape == (len(X), 2)
+
+
+# ── Clustering híbrido: significado + infraestructura ────────
+
+def test_infraestructura_incluye_dominio_base_y_excluye_cve():
+    s = cl.infraestructura({"ip": ["198.51.100.23"], "dominio": ["ransom.darkpay.onion"],
+                            "cve": ["CVE-2024-1234"], "md5": ["5d41402abc4b2a76b9719d911017c592"]})
+    assert "ip:198.51.100.23" in s
+    assert "dominio:ransom.darkpay.onion" in s and "dominio:darkpay.onion" in s
+    assert not any(x.startswith("cve:") for x in s)   # un CVE lo explotan muchos actores
+
+
+def test_compartir_infraestructura_acerca_a_los_posts():
+    X = np.random.default_rng(0).normal(size=(3, 384))
+    infra = [{"ip:a"}, {"ip:a"}, {"ip:b"}]
+    D = cl.matriz_distancias(X, infra, alfa=0.5)
+    sin = cl.matriz_distancias(X, [set()] * 3, alfa=0.5)
+    assert D[0, 1] < sin[0, 1]          # comparten C2 => más cerca
+    assert D[0, 2] > sin[0, 2] - 1e-9   # no comparten => no se acercan
+
+
+def test_sin_infraestructura_la_distancia_es_la_semantica():
+    X = np.random.default_rng(1).normal(size=(4, 384))
+    D = cl.matriz_distancias(X, [set()] * 4, alfa=0.3)
+    Xn = X / np.linalg.norm(X, axis=1, keepdims=True)
+    esperada = np.clip(1 - Xn @ Xn.T, 0, 1)
+    np.fill_diagonal(esperada, 0)
+    assert np.allclose(D, esperada)
+
+
+def test_post_que_suena_distinto_pero_comparte_c2_va_a_su_campana():
+    # El caso real de post_002 del dataset sintético: su texto se parecía a
+    # otra campaña, pero compartía la IP de C2 con la suya.
+    rng = np.random.default_rng(3)
+    a, b = rng.normal(size=384), rng.normal(size=384)
+    X = np.array([a + rng.normal(scale=.3, size=384) for _ in range(3)]
+                 + [b + rng.normal(scale=.3, size=384) for _ in range(3)]
+                 + [b + rng.normal(scale=.3, size=384)])          # "suena" a B
+    infra = [{"ip:c2a"}, {"ip:c2a"}, {"ip:c2a"},
+             {"ip:c2b"}, {"ip:c2b"}, {"ip:c2b"},
+             {"ip:c2a"}]                                           # ...pero usa el C2 de A
+    etiquetas = cl.agrupar(X, infra, modo="hibrido")
+    assert etiquetas[6] == etiquetas[0] != -1
+    assert etiquetas[3] == etiquetas[4] == etiquetas[5] != etiquetas[0]
+
+
+def test_muestra_grande_hibrido_al_menos_tan_bueno_como_semantico():
+    from sklearn.metrics import adjusted_rand_score
+    X, y = _campanas()
+    infra = [{f"ip:c{c}"} if c >= 0 and i % 2 == 0 else set() for i, c in enumerate(y)]
+    hib = adjusted_rand_score(y, cl.agrupar(X, infra, modo="hibrido"))
+    sem = adjusted_rand_score(y, cl.agrupar(X, infra, modo="semantico"))
+    assert hib >= sem - 0.05
+
+
+def test_modo_desconocido_da_error():
+    with pytest.raises(ValueError, match="modo"):
+        cl.agrupar(np.zeros((4, 8)) + np.eye(4, 8), [set()] * 4, modo="magia")
+
+
+def test_infraestructura_compartida_explica_cada_campana():
+    infra = [{"ip:a", "dominio:x.onion"}, {"ip:a"}, {"ip:b"}, {"ip:b"}, {"ip:z"}]
+    r = cl.infraestructura_compartida(infra, [0, 0, 1, 1, -1])
+    assert r == {0: ["ip:a"], 1: ["ip:b"]}

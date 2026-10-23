@@ -3,7 +3,7 @@ Pipeline completo de DarkIntel en UN solo proceso (frente E1).
 
     [1/4] Carga y validación de posts (data/raw o dataset sintético)
     [2/4] NER híbrido: regex + Transformer + base de conocimiento
-    [3/4] Campañas: embeddings + UMAP + HDBSCAN
+    [3/4] Campañas: significado (embeddings) + infraestructura compartida
     [4/4] STIX 2.1: un bundle por campaña
 
 Antes, run_ner.py, run_clustering.py y run_stix.py se ejecutaban por
@@ -125,18 +125,27 @@ def run() -> int:
     tiempos["ner"] = _fin(t)
 
     # ── 3. Campañas ─────────────────────────────────────────
-    t = _fase(3, "Campañas: embeddings + UMAP + HDBSCAN")
-    from darkintel.clustering.cluster import clustering, proyeccion_2d, reducir_dimensiones
+    modo = os.environ.get("DARKINTEL_CLUSTERING", "hibrido")
+    alfa = float(os.environ.get("DARKINTEL_CLUSTER_ALFA", "0.5"))
+    detalle = (f"significado + infraestructura compartida (alfa={alfa})"
+               if modo == "hibrido" else "solo significado (UMAP + HDBSCAN)")
+    t = _fase(3, f"Campañas: {detalle}")
+    from darkintel.clustering.cluster import (agrupar, infraestructura,
+                                              infraestructura_compartida, proyeccion_2d)
     from darkintel.clustering.embedder import generar_embeddings
 
     embeddings = generar_embeddings(
         [_texto_para_embedding(p, r) for p, r in zip(posts, resultados)],
         mostrar_progreso=False)
-    labels = [int(l) for l in clustering(reducir_dimensiones(embeddings))]
+    infra = [infraestructura(r["iocs"]) for r in resultados]
+    labels = [int(l) for l in agrupar(embeddings, infra, modo=modo, alfa=alfa)]
+    compartida = infraestructura_compartida(infra, labels)
     for cluster_id in sorted(set(labels)):
         nombre = "Ruido" if cluster_id == -1 else f"Campaña {cluster_id}"
         miembros = [posts[i]["post_id"] for i, l in enumerate(labels) if l == cluster_id]
         print(f"  {nombre}: {miembros}")
+        if compartida.get(cluster_id):
+            print(f"      🔗 comparten: {', '.join(compartida[cluster_id])}")
 
     os.makedirs(CARPETA_SALIDA, exist_ok=True)
     ruta_png = os.path.join(CARPETA_SALIDA, "clusters.png")

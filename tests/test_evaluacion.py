@@ -185,3 +185,20 @@ def test_cli_acuerdo_con_archivo_faltante(tmp_path):
     assert r.returncode == 1
     assert "Traceback" not in r.stderr
     assert "lo crea el anotador" in r.stdout
+
+
+# ── ARI (clustering de campañas) ─────────────────────────────
+
+def test_ari_casos_conocidos():
+    assert ev.ari([0, 0, 1, 1], [5, 5, 9, 9]) == 1.0           # mismas campañas, otros nombres
+    assert ev.ari([0, 0, 1, 1], [0, 1, 0, 1]) < 0              # peor que el azar
+    assert abs(ev.ari([0, 0, 0, 1, 1, 1], [0, 0, 1, 1, 2, 2]) - 0.2424) < 1e-3
+
+
+def test_ari_campanas_trata_el_ruido_como_grupos_individuales():
+    campanas = {"c1": ["p01", "p02"], "ruido": ["p03", "p04"]}
+    ids = ["p01", "p02", "p03", "p04"]
+    # Acierta: c1 junta, y el ruido como ruido
+    assert ev.ari_campanas(campanas, {"p01": 0, "p02": 0, "p03": -1, "p04": -1}, ids) == 1.0
+    # Error: junta los dos posts de ruido en una "campaña"
+    assert ev.ari_campanas(campanas, {"p01": 0, "p02": 0, "p03": 1, "p04": 1}, ids) < 1.0

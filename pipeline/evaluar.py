@@ -11,6 +11,9 @@ Uso típico:
     # Acuerdo entre los dos anotadores (antes de crear anotaciones_final)
     python pipeline/evaluar.py --acuerdo anotaciones_A.jsonl anotaciones_B.jsonl
 
+    # Calidad del agrupamiento en campañas (ARI): semántico vs. híbrido
+    python pipeline/evaluar.py --campanas
+
     # Métricas FINALES del paper: una sola vez, al terminar todo
     python pipeline/evaluar.py --split test --final
 
@@ -114,6 +117,55 @@ def imprimir_tabla(titulo: str, metricas: dict) -> None:
 
 # ── Main ────────────────────────────────────────────────────
 
+# ── Campañas (clustering) ───────────────────────────────────
+
+def evaluar_campanas(args, posts: dict, post_ids: list) -> int:
+    """
+    ARI del agrupamiento frente a campanas.json, para el método solo
+    semántico y para el híbrido con varios valores de alfa.
+    (Calibrar alfa SOLO mirando el split dev.)
+    """
+    from darkintel.clustering.cluster import agrupar, infraestructura
+    from darkintel.clustering.embedder import generar_embeddings
+    from darkintel.evaluacion import ari_campanas
+    from darkintel.ner.hibrido import extraer
+
+    ruta = os.path.join(args.dir, "campanas.json")
+    if not os.path.exists(ruta):
+        print(f"❌ No existe {ruta} (lo crea el escritor de los posts, guía sección 3.6)")
+        return 1
+    with open(ruta, encoding="utf-8") as f:
+        campanas = json.load(f)
+
+    print(f"📂 {len(post_ids)} posts del split '{args.split}' — referencia: campanas.json")
+    resultados = [extraer(posts[pid]["text"]) for pid in post_ids]
+    textos = [posts[pid]["text"] + " " + " ".join(
+        v for g in ("iocs", "entidades") for vs in r[g].values() for v in vs)
+        for pid, r in zip(post_ids, resultados)]
+    embeddings = generar_embeddings(textos, mostrar_progreso=False)
+    infra = [infraestructura(r["iocs"]) for r in resultados]
+
+    configuraciones = [("semantico", None)] + [("hibrido", a) for a in (0.3, 0.5, 0.7)]
+    salida = {}
+    print(f"\n  {'método':26s} {'ARI':>6s}   campañas   ruido")
+    for modo, alfa in configuraciones:
+        etiquetas = agrupar(embeddings, infra, modo=modo, alfa=alfa if alfa is not None else 0.5)
+        predichas = dict(zip(post_ids, (int(e) for e in etiquetas)))
+        valor = ari_campanas(campanas, predichas, post_ids)
+        nombre = modo if alfa is None else f"{modo} (alfa={alfa})"
+        n_camp = len(set(predichas.values()) - {-1})
+        n_ruido = sum(1 for e in predichas.values() if e == -1)
+        print(f"  {nombre:26s} {valor:6.3f}   {n_camp:8d}   {n_ruido:5d}")
+        salida[nombre] = {"ari": round(valor, 4), "campanas": n_camp, "ruido": n_ruido}
+    print("\nARI: 1 = mismas campañas que campanas.json; ~0 = como agrupar al azar.")
+
+    if args.salida:
+        os.makedirs(os.path.dirname(args.salida) or ".", exist_ok=True)
+        with open(args.salida, "w", encoding="utf-8") as f:
+            json.dump({"split": args.split, "campanas": salida}, f, ensure_ascii=False, indent=2)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -126,6 +178,8 @@ def main() -> int:
     parser.add_argument("--acuerdo", nargs=2, metavar=("A", "B"),
                         help="compara dos archivos de anotaciones entre sí")
     parser.add_argument("--salida", help="guardar resultados en este JSON")
+    parser.add_argument("--campanas", action="store_true",
+                        help="evaluar el agrupamiento en campañas (ARI) contra campanas.json")
     args = parser.parse_args()
 
     ruta_posts = os.path.join(args.dir, "posts.jsonl")
@@ -162,6 +216,11 @@ def main() -> int:
         print("   sola vez. Durante el desarrollo usa --split dev. Si de verdad es la")
         print("   evaluación final, agrega --final.")
         return 1
+
+    # El agrupamiento se evalúa contra campanas.json: no necesita anotaciones
+    if args.campanas:
+        ids = sorted(pid for pid, p in posts.items() if p["split"] == args.split)
+        return evaluar_campanas(args, posts, ids)
 
     errs, referencia = validar_anotaciones(os.path.join(args.dir, args.referencia), posts)
     if errs:

@@ -275,3 +275,51 @@ def comparar(referencia: dict, prediccion: dict, post_ids) -> dict:
         sumar("entidades_deteccion", det_ref, det_pred)
 
     return {clave: prf(*valores) for clave, valores in cont.items()}
+
+
+# ── Evaluación del clustering (campañas) ────────────────────
+
+def _comb2(n: int) -> int:
+    return n * (n - 1) // 2
+
+
+def ari(etiquetas_reales: list, etiquetas_predichas: list) -> float:
+    """
+    Adjusted Rand Index (Hubert y Arabie, 1985), sin dependencias externas.
+    1.0 = mismas campañas; ~0 = no mejor que agrupar al azar.
+    """
+    n = len(etiquetas_reales)
+    if n != len(etiquetas_predichas):
+        raise ValueError("las dos listas deben tener la misma longitud")
+    if n < 2:
+        return 1.0
+    tabla, filas, columnas = {}, {}, {}
+    for r, p in zip(etiquetas_reales, etiquetas_predichas):
+        tabla[(r, p)] = tabla.get((r, p), 0) + 1
+        filas[r] = filas.get(r, 0) + 1
+        columnas[p] = columnas.get(p, 0) + 1
+    indice = sum(_comb2(v) for v in tabla.values())
+    suma_filas = sum(_comb2(v) for v in filas.values())
+    suma_columnas = sum(_comb2(v) for v in columnas.values())
+    esperado = suma_filas * suma_columnas / _comb2(n)
+    maximo = (suma_filas + suma_columnas) / 2
+    if maximo == esperado:   # particiones triviales (todo junto o todo separado)
+        return 1.0 if indice == maximo else 0.0
+    return (indice - esperado) / (maximo - esperado)
+
+
+def ari_campanas(campanas: dict, predichas: dict, post_ids: list) -> float:
+    """
+    Compara las campañas predichas {post_id: etiqueta} con campanas.json.
+
+    El ruido no es una campaña: cada post de "ruido" (referencia) y cada post
+    con etiqueta -1 (predicción) cuenta como un grupo de un solo elemento.
+    """
+    referencia = {}
+    for nombre, ids in campanas.items():
+        for pid in ids:
+            referencia[pid] = f"ruido:{pid}" if nombre == "ruido" else nombre
+    reales = [referencia[pid] for pid in post_ids]
+    predichas_lista = [f"ruido:{pid}" if int(predichas[pid]) == -1 else int(predichas[pid])
+                       for pid in post_ids]
+    return ari(reales, predichas_lista)
