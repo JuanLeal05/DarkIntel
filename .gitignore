@@ -22,3 +22,5 @@ __pycache__/
 clusters.png
 data/output/
 data/raw/
+
+.venv-gpu/
