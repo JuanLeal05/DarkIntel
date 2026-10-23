@@ -6,8 +6,8 @@ Pipeline completo de DarkIntel en UN solo proceso (frente E1).
     [3/4] Campañas: significado (embeddings) + infraestructura compartida
     [4/4] STIX 2.1: un bundle por campaña
 
-Antes, run_ner.py, run_clustering.py y run_stix.py se ejecutaban por
-separado: el modelo NER se cargaba tres veces y los embeddings y el
+Reemplaza a los antiguos run_clustering.py y run_stix.py, que se ejecutaban
+por separado: el modelo NER se cargaba tres veces y los embeddings y el
 clustering se calculaban dos veces (con riesgo de que el gráfico y los
 bundles no coincidieran). Aquí todo se calcula una vez.
 

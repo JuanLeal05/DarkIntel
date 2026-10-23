@@ -57,7 +57,7 @@ RUTA_BUNDLES = os.path.join(
     os.path.dirname(__file__), "..", "data", "output", "stix_bundles.json"
 )
 
-# Clave que run_stix.py usa para los posts que HDBSCAN marca como ruido.
+# Clave que el pipeline usa para los posts que HDBSCAN marca como ruido.
 CLAVE_RUIDO = "cluster_-1"
 
 
@@ -66,7 +66,7 @@ def cargar_bundles() -> dict:
     if not os.path.exists(RUTA_BUNDLES):
         raise HTTPException(
             status_code=404,
-            detail="No hay bundles generados. Ejecuta pipeline/run_stix.py primero."
+            detail="No hay bundles generados. Ejecuta el pipeline primero (pipeline/run_pipeline.py)."
         )
     with open(RUTA_BUNDLES, encoding="utf-8") as f:
         return json.load(f)
@@ -78,6 +78,7 @@ def raiz():
     return {
         "servicio": "DarkIntel API",
         "version": "1.0.0",
+        "documentacion": "/docs",
         "endpoints": [
             "/stix/bundles",
             "/stix/bundles/{cluster_id}",

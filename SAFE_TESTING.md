@@ -12,12 +12,13 @@ sesión aislada (ver "Entorno del host" al final) desde la Etapa 2 en adelante.
 ## Etapa 0 — Unitarios (sin red, sin Docker)
 
 ```bash
-python3 tests/test_fetcher.py
+python -m pytest tests/test_fetcher.py -v
 ```
 
-Confirma que `obtener_html()`, el límite de tamaño de respuesta y la
-validación de `socks5h://` funcionan en aislamiento, con `requests.get`
-mockeado. Cero riesgo: no sale ni un paquete a la red. Correr esto primero
+Confirma que `obtener_html()` y sus defensas funcionan en aislamiento, con
+`requests.get` simulado: límite de tamaño, tiempo total máximo, redirecciones
+solo hacia `.onion`, validación de `socks5h://`, intervalo real de 10 s entre
+`NEWNYM` y reintentos solo ante fallos de red. Cero riesgo: no sale ni un paquete a la red. Correr esto primero
 siempre que toques `fetcher.py`.
 
 ---
@@ -72,17 +73,19 @@ Tor — no en el objetivo. Resuélvelo aquí antes de seguir.
 
 ### Cierre del ciclo: ¿el análisis sí procesa lo scrapeado?
 
-El scraper ya guarda el post en `data/raw/` (vía `storage.guardar_json`).
-Corre el pipeline justo después, en el mismo volumen, para confirmar que
-`run_ner.py` lo recoge automáticamente en vez de usar el dataset sintético:
+El scraper guarda cada página en `data/raw/` (volumen `raw_data`). Corre el
+pipeline justo después para confirmar que el processor lo recoge, valida y
+analiza en vez de usar el dataset sintético:
 
 ```bash
-docker compose --profile testing run --rm processor python pipeline/run_ner.py
+docker compose run --rm processor
 ```
 
-Debe imprimir `fuente: data/raw (scraper real)` y detectar los IoCs de
-prueba que trae `docker/test-onion/index.html` (una IP, un CVE y un hash,
-todos marcados como "de prueba" para no confundirlos con datos reales).
+Debe mostrar `fuente: data/raw (recolectado por el scraper vía Tor)` y, en
+la fase de campañas, los dos grupos de las páginas de prueba con la
+infraestructura que comparten (`🔗 comparten: ...`). Todos los IoCs de las
+páginas son de prueba: IPs de documentación (RFC 5737), dominios inventados y
+CVE que no existen, para no confundirlos nunca con datos reales.
 Esto es lo que confirma el objetivo completo de la aplicación de punta a
 punta — no solo que Tor conecta, sino que lo que trae se analiza.
 

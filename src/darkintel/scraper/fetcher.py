@@ -261,9 +261,8 @@ if __name__ == "__main__":
 
         print(f"   Título: {titulo or '(sin título)'} — {len(html)} bytes")
 
-        # Este es el paso que faltaba: sin esto, el pipeline (run_ner/
-        # run_clustering/run_stix) nunca ve lo que el scraper trajo y sigue
-        # analizando solo el dataset sintético.
+        # El post va al volumen raw_data: el único canal hacia el backend.
+        # El processor lo valida antes de usarlo (data_loader.py).
         post = {
             "source": "scraper_tor",
             "url": url,

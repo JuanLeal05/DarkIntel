@@ -1,8 +1,8 @@
 -- DarkIntel — inicializacion de PostgreSQL con pgvector.
 --
--- PLACEHOLDER: el codigo actual todavia guarda todo en JSON plano
--- (data/raw y data/output). Este esquema prepara la migracion del
--- almacenamiento y de los embeddings a la base de datos.
+-- PENDIENTE (trabajo futuro): el pipeline guarda hoy sus resultados en JSON
+-- (data/output). Este esquema prepara la migración del almacenamiento y de
+-- los embeddings a PostgreSQL + pgvector; ningún servicio lo usa todavía.
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE TABLE IF NOT EXISTS iocs (
     id       BIGSERIAL PRIMARY KEY,
     post_id  TEXT REFERENCES posts(post_id) ON DELETE CASCADE,
-    tipo     TEXT NOT NULL,   -- ip | ipv6 | sha256 | md5 | cve | dominio
+    tipo     TEXT NOT NULL,   -- ip | ipv6 | sha256 | sha1 | md5 | cve | dominio
     valor    TEXT NOT NULL,
     UNIQUE (post_id, tipo, valor)
 );

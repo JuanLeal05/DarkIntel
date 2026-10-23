@@ -16,3 +16,8 @@ clusters.png
 data/raw/
 data/output/
 README-docker.md
+.venv-gpu/
+docs/
+tests/
+README.md
+*.patch

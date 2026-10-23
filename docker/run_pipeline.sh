@@ -3,8 +3,7 @@
 # carga -> NER híbrido -> campañas (UMAP + HDBSCAN) -> bundles STIX 2.1.
 # El modelo NER y los embeddings se cargan y calculan una sola vez.
 #
-# Los scripts por fase (run_ner.py, run_clustering.py, run_stix.py) siguen
-# disponibles para depurar una fase concreta.
+# Para depurar solo la extracción: python pipeline/run_ner.py
 set -e
 
 python pipeline/run_pipeline.py

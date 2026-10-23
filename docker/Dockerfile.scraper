@@ -23,6 +23,7 @@ RUN useradd --create-home --uid 1000 scraper \
     && chown -R scraper:scraper /app
 USER scraper
 
-# Placeholder: hoy ejecuta el __main__ de fetcher.py (HTTP plano contra
-# books.toscrape.com). Se reemplaza cuando se integre Tor/SOCKS5.
+# Recolecta las URLs de SCRAPER_TARGET_URL vía Tor (fetcher.py): rotación de
+# circuitos, límites de tamaño y tiempo, redirecciones solo hacia .onion.
+# Ver SAFE_TESTING.md antes de apuntarlo a un objetivo real.
 CMD ["python", "/app/src/darkintel/scraper/fetcher.py"]

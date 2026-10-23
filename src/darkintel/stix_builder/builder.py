@@ -93,20 +93,6 @@ def crear_indicador(tipo: str, valor: str, fecha: str) -> Indicator:
     )
 
 
-# Compatibilidad con el código y los tests anteriores
-def crear_indicador_ip(ip: str, fecha: str = FECHA_POR_DEFECTO) -> Indicator:
-    return crear_indicador("ip", ip, fecha)
-
-
-def crear_indicador_dominio(dominio: str, fecha: str = FECHA_POR_DEFECTO) -> Indicator:
-    return crear_indicador("dominio", dominio, fecha)
-
-
-def crear_indicador_hash(valor_hash: str, algoritmo: str, fecha: str = FECHA_POR_DEFECTO) -> Indicator:
-    tipo = {"SHA-256": "sha256", "SHA-1": "sha1", "MD5": "md5"}[algoritmo]
-    return crear_indicador(tipo, valor_hash, fecha)
-
-
 def crear_vulnerabilidad_cve(cve_id: str, fecha: str = FECHA_POR_DEFECTO) -> Vulnerability:
     return Vulnerability(
         id=_id("vulnerability", cve_id),

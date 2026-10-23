@@ -1,16 +1,13 @@
-beautifulsoup4==4.15.0
-certifi==2026.7.22
-charset-normalizer==3.5.1
-idna==3.19
-lxml==6.1.3
-requests==2.34.2
-soupsieve==2.9.2
-typing_extensions==4.16.0
-urllib3==2.8.0
-sentence-transformers
-umap-learn
-hdbscan
-matplotlib
-stix2
-fastapi
-uvicorn
+# Entorno de desarrollo LOCAL (pytest, scripts de pipeline/ fuera de Docker).
+# Reúne las dependencias de los tres contenedores + las de los tests.
+#
+# Instalar PyTorch para CPU ANTES de este archivo (si no, pip baja la versión
+# con CUDA, ~2 GB):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+-r docker/requirements-scraper.txt
+-r docker/requirements-backend.txt
+-r docker/requirements-api.txt
+transformers>=4.40
+pytest>=8.0
+httpx>=0.27

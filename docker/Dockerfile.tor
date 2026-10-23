@@ -1,6 +1,9 @@
-# DarkIntel — proxy Tor (red: darknet)
+# DarkIntel — proxy Tor (redes: darknet + tor_egress)
 #
-# Recolecta las URLs de SCRAPER_TARGET_URL vía Tor (ver SAFE_TESTING.md).
+# Daemon Tor en modo SOLO CLIENTE (sin relay ni nodo de salida). Expone
+# SOCKS5 (:9050) y ControlPort (:9051) únicamente dentro de la red darknet.
+# El HashedControlPassword se genera al arrancar a partir de
+# TOR_CONTROL_PASSWORD (docker/tor-entrypoint.sh): no hay hashes en el repo.
 FROM debian:bookworm-slim
 
 RUN apt-get update \

@@ -30,8 +30,8 @@ un objetivo real, sigue el orden de pruebas de [SAFE_TESTING.md](SAFE_TESTING.md
           │  backend  (internal: true)          │
           │                                     │
           │   processor ─────────► db           │
-          │   NER, embeddings,     (Postgres +  │
-          │   UMAP/HDBSCAN, STIX    pgvector)   │
+          │   NER híbrido,         (Postgres +  │
+          │   campañas, STIX        pgvector)*  │
           └─────┬───────────────────────────────┘
                 │ volumen output_data (ro)
           ┌─────┴───────────────────────────────┐
@@ -40,6 +40,7 @@ un objetivo real, sigue el orden de pruebas de [SAFE_TESTING.md](SAFE_TESTING.md
           └─────────────────────────────────────┘
 
   * test-onion solo existe con --profile testing
+  * db: el esquema existe, pero el pipeline aún guarda en JSON (trabajo futuro)
 ```
 
 ## Decisiones de seguridad
@@ -131,7 +132,38 @@ docker compose run --rm --entrypoint sh scraper -c "rm -f /app/data/raw/*.json"
 docker compose run --rm processor
 ```
 
+El processor ejecuta `pipeline/run_pipeline.py` en un solo proceso y muestra
+cuatro fases numeradas con su tiempo:
+
+| Fase | Qué hace |
+|---|---|
+| 1. Carga | Lee y valida `data/raw` (o el dataset sintético si está vacío) |
+| 2. NER híbrido | Regex (IoCs) + SecureBERT-NER + base de conocimiento (malware, herramientas, actores, técnicas) |
+| 3. Campañas | Agrupa por significado **e infraestructura compartida** y muestra qué comparte cada campaña |
+| 4. STIX 2.1 | Un bundle por campaña |
+
+Salidas en el volumen `output_data`:
+
+| Archivo | Contenido |
+|---|---|
+| `stix_bundles.json` | Bundles STIX 2.1 que sirve la API |
+| `analisis.json` | Por post: campaña, IoCs y entidades |
+| `clusters.png` | Gráfico de las campañas |
+
 La API lee los bundles en cada petición: no hace falta reiniciarla.
+
+### Variables de configuración del pipeline
+
+Opcionales; se pasan con `-e` (por ejemplo,
+`docker compose run --rm -e DARKINTEL_CLUSTERING=semantico processor`).
+
+| Variable | Por defecto | Efecto |
+|---|---|---|
+| `DARKINTEL_NER_TRANSFORMER` | `1` | `0` desactiva el Transformer (solo regex + conocimiento) |
+| `DARKINTEL_NER_KB` | `1` | `0` desactiva la base de conocimiento |
+| `DARKINTEL_NER_UMBRAL` | `0.80` | Confianza mínima de las entidades del Transformer |
+| `DARKINTEL_CLUSTERING` | `hibrido` | `semantico` = solo embeddings (método anterior) |
+| `DARKINTEL_CLUSTER_ALFA` | `0.5` | Peso del significado frente a la infraestructura compartida |
 
 ### Después de cambiar código
 
@@ -180,15 +212,16 @@ docker compose up -d tor-proxy
 | `tor-proxy` | Funcional. SOCKS5 y ControlPort autenticado, hash generado al arrancar. |
 | `scraper` | Funcional vía Tor con las protecciones de la tabla anterior. Recolecta las URLs de `SCRAPER_TARGET_URL`; todavía no descubre enlaces por sí mismo (no hay crawling). |
 | `test-onion` | Hidden service propio para pruebas (perfil `testing`). |
-| `processor` | Funcional: valida `data/raw`, extrae IoCs con regex, agrupa con embeddings + UMAP + HDBSCAN y genera bundles STIX 2.1. Usa `data/raw` si tiene posts; si no, el dataset sintético. |
-| `api` | Funcional. Sirve los bundles generados y extrae IoCs en vivo. |
+| `processor` | Funcional: valida `data/raw`, NER híbrido (regex + SecureBERT-NER + base de conocimiento), campañas por significado e infraestructura compartida, y bundles STIX 2.1 con malware, herramientas, actores y técnicas. Usa `data/raw` si tiene posts; si no, el dataset sintético. |
+| `api` | Funcional. Sirve los bundles generados y extrae IoCs en vivo (`POST /iocs/extract` usa solo la regex: la imagen de la API no incluye los modelos). |
 | `db` | Arranca con el esquema de `docker/postgres/init.sql` (pgvector), pero el pipeline todavía guarda en JSON: **pendiente**. |
 
-### Pendiente (siguiente iteración)
+### Pendiente (trabajo futuro)
 
-- NER con Transformer (SecureBERT/DarkBERT) para malware, actores y herramientas.
-- Persistencia en PostgreSQL + pgvector.
+- Persistencia en PostgreSQL + pgvector (el esquema ya existe en `docker/postgres/init.sql`).
 - Enriquecimiento (VirusTotal, AbuseIPDB, OTX, WHOIS) y reportes con RAG.
+- Descubrimiento automático de enlaces (crawling); hoy se recolectan las URLs indicadas.
+- Ajuste fino (fine-tuning) del modelo NER si las métricas sobre el dataset de evaluación lo requieren.
 
 ## Antes de correr el scraper contra un objetivo real
 

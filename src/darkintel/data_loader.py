@@ -1,6 +1,6 @@
 """
-Punto único de carga de posts para el pipeline (run_ner / run_clustering /
-run_stix). Si hay posts reales en data/raw/, los usa; si no, cae de vuelta al
+Punto único de carga de posts para el pipeline (pipeline/run_pipeline.py y
+run_ner.py). Si hay posts reales en data/raw/, los usa; si no, cae de vuelta al
 dataset sintético — así el pipeline sigue corriendo igual para la demo aunque
 no hayas scrapeado nada todavía.
 
@@ -182,7 +182,7 @@ def cargar_posts() -> tuple[list[dict], bool]:
 
     es_sintetico=True  -> viene de synthetic_darkweb_dump.json, TIENE
                            labels_manual, se le pueden calcular métricas
-                           precision/recall/F1 (run_ner.py).
+                           precision/recall/F1 sobre los IoCs.
     es_sintetico=False -> viene de data/raw/ (scraper real), validado y sin
                            ground truth. Si había archivos pero todos eran
                            inválidos, devuelve una lista vacía: NO cae al
