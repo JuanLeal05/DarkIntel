@@ -173,3 +173,52 @@ def test_umbral_cero_no_cambia_las_metricas():
     pred = [["B-MAL", "O", "B-MAL"]]
     conf = [[0.9, 1.0, 0.3]]
     assert me.evaluar(refs, [ev.aplicar_umbral(pred[0], conf[0], 0.0)]) == me.evaluar(refs, pred)
+
+
+# ── Evaluación del sistema completo sobre CyberNER ───────────
+
+def _frase(tokens, etiquetas):
+    return {"id": "X-1", "fuente": "X", "tokens": tokens, "etiquetas": etiquetas}
+
+
+def test_referencia_de_convierte_bio_a_formato_de_evaluar():
+    import evaluar_sistema as es
+    f = _frase(["APT28", "used", "Cobalt", "Strike", "and", "Cobalt", "Strike"],
+               ["B-APT", "O", "B-TOOL", "I-TOOL", "O", "B-TOOL", "I-TOOL"])
+    ref = es.referencia_de(f)
+    assert ref["entidades"]["actor"] == ["APT28"]
+    assert ref["entidades"]["herramienta"] == ["Cobalt Strike"]   # sin repetir
+    assert all(v == [] for v in ref["iocs"].values())
+
+
+def _pred(**entidades):
+    base = {t: [] for t in ("malware", "herramienta", "actor", "tecnica")}
+    base.update(entidades)
+    return {"iocs": {}, "entidades": base}
+
+
+def test_parcial_acepta_nombre_contenido_con_el_mismo_tipo():
+    import evaluar_sistema as es
+    refs = {"a": _pred(tecnica=["spear-phishing emails"], malware=["Ryuk"])}
+    preds = {"a": _pred(tecnica=["spear-phishing"], herramienta=["Ryuk"])}
+    m = es.comparar_parcial(refs, preds, ["a"])
+    assert m["entidades.tecnica"]["tp"] == 1                       # contenido: acierto
+    assert m["entidades.herramienta"]["fp"] == 1                   # tipo distinto: fallo
+    assert m["entidades.malware"]["fn"] == 1
+
+
+def test_parcial_exige_palabras_completas_y_empareja_uno_a_uno():
+    import evaluar_sistema as es
+    refs = {"a": _pred(malware=["Emotet"], tecnica=["phishing"])}
+    preds = {"a": _pred(malware=["Emo"], tecnica=["phishing", "spear phishing"])}
+    m = es.comparar_parcial(refs, preds, ["a"])
+    v = m["entidades.malware"]
+    assert (v["tp"], v["fp"], v["fn"]) == (0, 1, 1)                # "Emo" no es palabra completa
+    v = m["entidades.tecnica"]
+    assert (v["tp"], v["fp"], v["fn"]) == (1, 1, 0)                # una referencia, un acierto
+
+
+def test_evaluar_sistema_exige_final_para_test(monkeypatch, capsys):
+    import evaluar_sistema as es
+    monkeypatch.setattr(sys, "argv", ["evaluar_sistema.py", "--split", "test"])
+    assert es.main() == 2

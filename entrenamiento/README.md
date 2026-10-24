@@ -11,6 +11,7 @@ STIX 2.1, citado en el paper del proyecto.
 | `preparar_cyberner.py` | Convierte el CSV de CyberNER a las 4 categorías de DarkIntel y lo divide en train/dev/test | No |
 | `entrenar_ner.py` | Ajusta SecureBERT-NER con train; elige la mejor época con dev | Sí |
 | `evaluar_ner.py` | Compara modelos sobre test, por tipo y por fuente | Recomendable |
+| `evaluar_sistema.py` | Mide el sistema completo (Transformer + base de conocimiento) sobre CyberNER | No (más rápido con GPU) |
 | `metricas.py` | F1 a nivel de entidad (usado por los dos anteriores) | No |
 
 ## Decisiones de diseño
@@ -124,6 +125,30 @@ Remove-Item Env:DARKINTEL_NER_MODEL, Env:DARKINTEL_NER_UMBRAL
 **Docker:** en `.env`, `DARKINTEL_NER_MODEL=/app/modelos/darkintel-ner-v1` y
 `DARKINTEL_NER_UMBRAL=<el calibrado>`, y
 después `docker compose build processor`.
+
+### 8. Medir el sistema completo sobre CyberNER
+
+`evaluar_ner.py` mide solo el modelo. Este mide lo que entrega DarkIntel
+(`ner/hibrido.py`) en tres modos: `kb`, `transformer` e `hibrido`. Cada frase
+se trata como un post y se compara el conjunto de entidades, igual que en
+`pipeline/evaluar.py`:
+
+```powershell
+.venv\Scripts\Activate.ps1
+$env:DARKINTEL_NER_MODEL = "modelos\darkintel-ner-v1"
+$env:DARKINTEL_NER_UMBRAL = "0.5"
+python entrenamiento/evaluar_sistema.py --limite 100      # prueba rápida
+python entrenamiento/evaluar_sistema.py                   # dev completo
+python entrenamiento/evaluar_sistema.py --split test --final   # UNA vez, para el paper
+```
+
+Da dos criterios: **estricto** (nombre y tipo exactos) y **parcial** (mismo
+tipo y un nombre contiene al otro). CyberNER suele incluir el sustantivo
+("spear-phishing emails") y DarkIntel extrae solo la técnica
+("spear-phishing"). Además, CyberNER no siempre es coherente (Ryuk o njRAT
+aparecen como herramienta, REvil como actor) y deja sin anotar muchas
+menciones de "phishing", así que su precisión es una **cota inferior** de la
+real. En el paper se dan los dos criterios.
 
 ## Qué reportar en el paper
 
