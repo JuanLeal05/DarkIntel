@@ -2,7 +2,7 @@
 #
 #   tor_egress (salida)      : SOLO tor-proxy y test-onion. Unica red con
 #                              salida a internet, y solo la usa el daemon Tor.
-#   darknet    (riesgo)      : tor-proxy + scraper (+ test-onion). internal=true:
+#   darknet    (riesgo)      : tor-proxy + scraper. internal=true:
 #                              el scraper NO tiene salida directa a internet;
 #                              su unico camino hacia afuera es el SOCKS de Tor.
 #                              Si algo intenta salir sin Tor, no hay ruta (fail-closed).
@@ -22,18 +22,28 @@
 name: darkintel
 
 networks:
+  # Subredes fijas: permiten reglas de firewall estables en el host
+  # (DOCKER-USER, ver docs/despliegue_gcp.md, paso 0.9).
   tor_egress:
     name: darkintel_tor_egress
+    ipam:
+      config: [{subnet: 172.30.0.0/24}]
     # NO es internal: el daemon Tor necesita salida a internet para construir
     # circuitos. Solo tor-proxy y test-onion se conectan aqui.
   darknet:
     name: darkintel_darknet
     internal: true          # scraper <-> tor-proxy, sin salida directa
+    ipam:
+      config: [{subnet: 172.30.1.0/24}]
   backend:
     name: darkintel_backend
     internal: true
+    ipam:
+      config: [{subnet: 172.30.2.0/24}]
   frontend:
     name: darkintel_frontend
+    ipam:
+      config: [{subnet: 172.30.3.0/24}]
 
 volumes:
   raw_data:        # scraper (rw) -> processor (ro)
@@ -69,6 +79,9 @@ services:
       start_period: 60s
     security_opt:
       - no-new-privileges:true
+    cap_drop: [ALL]          # Tor corre como debian-tor en puertos >1024: no necesita capacidades
+    mem_limit: 512m
+    pids_limit: 256
 
   # Objetivo de prueba local — ver SAFE_TESTING.md, Etapa 1. NO se levanta
   # con `docker compose up`: solo con `--profile testing`, para que no
@@ -79,9 +92,11 @@ services:
       dockerfile: docker/Dockerfile.test-onion
     image: darkintel/test-onion:dev
     container_name: darkintel-test-onion
-    # tor_egress: su propio daemon Tor necesita publicar el descriptor del
-    # hidden service en la red Tor.
-    networks: [darknet, tor_egress]
+    # Solo tor_egress: su propio daemon Tor publica el descriptor del hidden
+    # service en la red Tor, y el scraper lo alcanza A TRAVES de Tor (como a
+    # cualquier .onion). No necesita estar en darknet: asi el scraper no
+    # tiene una ruta directa hacia otro contenedor con salida a internet.
+    networks: [tor_egress]
     profiles: ["testing"]
     restart: "no"
     volumes:
@@ -90,6 +105,9 @@ services:
       - testonion_data:/var/lib/tor
     security_opt:
       - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: 512m
+    pids_limit: 128
 
   scraper:
     build:
@@ -115,6 +133,14 @@ services:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    # Contenedor expuesto a contenido hostil: sin capacidades, sistema de
+    # archivos de solo lectura (solo escribe en el volumen raw_data y /tmp)
+    # y limites para que un .onion no pueda agotar la VM.
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp:size=64m,noexec,nosuid]
+    mem_limit: 1g
+    pids_limit: 128
 
   # ── Zona de procesamiento ─────────────────────────────────────────────
   db:
@@ -158,6 +184,10 @@ services:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    # Sin read_only: numba (umap) y matplotlib escriben caches en disco.
+    cap_drop: [ALL]
+    mem_limit: 10g           # PyTorch + SecureBERT + embeddings
+    pids_limit: 512
 
   # ── Zona de exposicion ────────────────────────────────────────────────
   api:
@@ -182,3 +212,8 @@ services:
         condition: service_completed_successfully
     security_opt:
       - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp:size=16m,noexec,nosuid]
+    mem_limit: 512m
+    pids_limit: 128

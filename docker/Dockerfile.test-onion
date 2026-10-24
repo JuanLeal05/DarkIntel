@@ -1,4 +1,4 @@
-# DarkIntel — objetivo de prueba (red: darknet)
+# DarkIntel — objetivo de prueba (red: tor_egress)
 #
 # Hidden service Tor propio que sirve una página HTML inocua y controlada.
 # Sirve para la Etapa 1 de pruebas (ver SAFE_TESTING.md): validar que
@@ -24,6 +24,6 @@ RUN useradd --create-home --uid 1000 testonion \
 USER testonion
 WORKDIR /srv/www
 
-# Arranca un servidor HTTP simple en :8080 y el daemon Tor que lo publica
-# como hidden service dentro de la red darknet.
-CMD ["sh", "-c", "python3 -m http.server 8080 --directory /srv/www & tor -f /etc/tor/torrc"]
+# Arranca un servidor HTTP simple en 127.0.0.1:8080 (solo visible dentro del
+# contenedor) y el daemon Tor que lo publica como hidden service.
+CMD ["sh", "-c", "python3 -m http.server 8080 --bind 127.0.0.1 --directory /srv/www & tor -f /etc/tor/torrc"]
