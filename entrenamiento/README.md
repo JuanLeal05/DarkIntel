@@ -95,19 +95,34 @@ aunque el tipo esté mal). Lo esperable: detección parecida, y mejor F1 por tip
 en el ajustado. Si pruebas varios hiperparámetros, compáralos con
 `--split dev`; usa `test` solo para el resultado final del paper.
 
-### 6. Usarlo en DarkIntel
+### 6. Calibrar el umbral de confianza (con dev)
+
+El umbral de 0,80 se fijó para el modelo original. El ajustado acierta el tipo
+de muchas herramientas con confianza más baja (~0,5), y con 0,80 las descarta.
+Se calibra en **dev**, nunca en test:
+
+```powershell
+python entrenamiento/evaluar_ner.py --split dev --modelos modelos/darkintel-ner-v1 --umbrales --salida modelos/umbrales_dev.json
+```
+
+Imprime P/R/F1 para cada umbral y el mejor. Ese valor va en
+`DARKINTEL_NER_UMBRAL`.
+
+### 7. Usarlo en DarkIntel
 
 **Local:**
 
 ```powershell
 .venv\Scripts\Activate.ps1
 $env:DARKINTEL_NER_MODEL = "modelos\darkintel-ner-v1"
+$env:DARKINTEL_NER_UMBRAL = "0.5"     # el que dio la calibración
 python pipeline/run_pipeline.py
 python pipeline/evaluar.py          # sobre el dataset de la demo (split dev)
-Remove-Item Env:DARKINTEL_NER_MODEL
+Remove-Item Env:DARKINTEL_NER_MODEL, Env:DARKINTEL_NER_UMBRAL
 ```
 
-**Docker:** en `.env`, `DARKINTEL_NER_MODEL=/app/modelos/darkintel-ner-v1`, y
+**Docker:** en `.env`, `DARKINTEL_NER_MODEL=/app/modelos/darkintel-ner-v1` y
+`DARKINTEL_NER_UMBRAL=<el calibrado>`, y
 después `docker compose build processor`.
 
 ## Qué reportar en el paper

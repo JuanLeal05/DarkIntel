@@ -154,3 +154,22 @@ def test_a_etiquetas_ignora_las_posiciones_minus_100():
     labels = [[-100, 3, -100, 0]]
     refs, p = en.a_etiquetas(preds, labels)
     assert refs == [["B-TOOL", "O"]] and p == [["B-TOOL", "O"]]
+
+
+# ── Calibración del umbral ───────────────────────────────────
+
+def test_aplicar_umbral_usa_la_confianza_media_de_la_entidad():
+    import evaluar_ner as ev
+    etiquetas = ["B-TOOL", "I-TOOL", "O", "B-APT"]
+    confianzas = [0.6, 0.4, 1.0, 0.99]          # Cobalt Strike: media 0.5; FIN7: 0.99
+    assert ev.aplicar_umbral(etiquetas, confianzas, 0.5) == etiquetas
+    assert ev.aplicar_umbral(etiquetas, confianzas, 0.8) == ["O", "O", "O", "B-APT"]
+    assert ev.aplicar_umbral(etiquetas, confianzas, 0.0) == etiquetas
+
+
+def test_umbral_cero_no_cambia_las_metricas():
+    import evaluar_ner as ev
+    refs = [["B-MAL", "O", "B-TOOL"]]
+    pred = [["B-MAL", "O", "B-MAL"]]
+    conf = [[0.9, 1.0, 0.3]]
+    assert me.evaluar(refs, [ev.aplicar_umbral(pred[0], conf[0], 0.0)]) == me.evaluar(refs, pred)

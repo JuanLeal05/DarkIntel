@@ -169,7 +169,8 @@ if __name__ == "__main__":
         "to dump credentials. The intrusion was attributed to FIN7, who "
         "gained initial access via spear-phishing."
     )
-    print(f"Modelo: {MODELO_NER} @ {REVISION_NER[:8]}\nTexto: {texto}\n")
+    origen = "(carpeta local)" if os.path.isdir(MODELO_NER) else f"@ {REVISION_NER[:8]}"
+    print(f"Modelo: {MODELO_NER} {origen} · umbral {UMBRAL_CONFIANZA}\nTexto: {texto}\n")
     print("── Predicciones crudas ──")
     for e in entidades_crudas(texto):
         print(f"  {e['etiqueta']:8s} {e['confianza']:.3f}  {e['texto']!r}")
