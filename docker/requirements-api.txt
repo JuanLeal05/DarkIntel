@@ -1,0 +1,4 @@
+# Zona de exposicion (frontend): la API solo sirve bundles ya generados
+# y corre el extractor regex (stdlib). No necesita el stack de ML.
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0

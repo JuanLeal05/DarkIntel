@@ -1,0 +1,11 @@
+# Zona de procesamiento (backend): NER, embeddings, clustering y STIX.
+# Las versiones sin pin exacto usan rangos conservadores; el pin definitivo
+# sale de un `pip freeze` una vez que la imagen quede estable.
+sentence-transformers>=3.0,<6.0
+umap-learn>=0.5.5,<0.6
+hdbscan>=0.8.38,<0.9
+matplotlib>=3.8,<4.0
+stix2>=3.0,<4.0
+numpy>=1.26,<3.0
+# Validacion del volumen raw_data (frontera de confianza, ver data_loader.py)
+pydantic>=2.5,<3.0

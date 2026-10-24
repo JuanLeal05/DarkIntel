@@ -3,21 +3,20 @@ import os
 from datetime import datetime, timezone
 
 
-def guardar_json(datos: dict, carpeta: str = "data/raw", nombre_archivo: str | None = None) -> str:
+def guardar_json(datos: dict, carpeta: str = "data/raw",
+                 nombre_archivo: str = None) -> str:
     """
-    Guarda un diccionario como archivo JSON en la carpeta indicada.
-    Si no se especifica nombre_archivo, genera uno único con timestamp.
-    Devuelve la ruta completa del archivo guardado.
+    Guarda un diccionario como JSON en disco con timestamp automático.
     """
     os.makedirs(carpeta, exist_ok=True)
 
     if nombre_archivo is None:
-        marca_tiempo = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        nombre_archivo = f"scrape_{marca_tiempo}.json"
+        marca = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        nombre_archivo = f"resultado_{marca}.json"
 
-    ruta_completa = os.path.join(carpeta, nombre_archivo)
+    ruta = os.path.join(carpeta, nombre_archivo)
 
-    with open(ruta_completa, "w", encoding="utf-8") as archivo:
-        json.dump(datos, archivo, ensure_ascii=False, indent=2)
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)
 
-    return ruta_completa
+    return ruta

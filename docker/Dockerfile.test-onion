@@ -1,0 +1,29 @@
+# DarkIntel — objetivo de prueba (red: darknet)
+#
+# Hidden service Tor propio que sirve una página HTML inocua y controlada.
+# Sirve para la Etapa 1 de pruebas (ver SAFE_TESTING.md): validar que
+# fetcher.py + stem funcionan extremo a extremo SIN salir a la dark web
+# pública ni a internet. Todo el tráfico queda dentro del contenedor/host.
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tor python3 curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/test-onion/torrc /etc/tor/torrc
+COPY docker/test-onion/*.html /srv/www/
+
+RUN useradd --create-home --uid 1000 testonion \
+    && mkdir -p /var/lib/tor/test_service \
+    && chown -R testonion:testonion /var/lib/tor /srv/www \
+    # Tor EXIGE permisos 0700 en DataDirectory y HiddenServiceDir: con
+    # cualquier cosa mas permisiva se niega a arrancar con
+    # "Permissions on directory ... are too permissive".
+    && chmod 700 /var/lib/tor /var/lib/tor/test_service
+
+USER testonion
+WORKDIR /srv/www
+
+# Arranca un servidor HTTP simple en :8080 y el daemon Tor que lo publica
+# como hidden service dentro de la red darknet.
+CMD ["sh", "-c", "python3 -m http.server 8080 --directory /srv/www & tor -f /etc/tor/torrc"]

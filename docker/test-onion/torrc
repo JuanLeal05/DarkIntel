@@ -1,0 +1,9 @@
+# Hidden service de PRUEBA, propio del proyecto. Sirve contenido inocuo
+# generado por nosotros mismos. Existe únicamente para poder probar
+# fetcher.py contra un .onion real sin tocar la dark web pública.
+SocksPort 0
+DataDirectory /var/lib/tor
+Log notice stdout
+
+HiddenServiceDir /var/lib/tor/test_service/
+HiddenServicePort 80 127.0.0.1:8080

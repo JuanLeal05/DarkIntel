@@ -1,0 +1,29 @@
+# DarkIntel — contenedor de recoleccion (red: darknet)
+#
+# Zona de riesgo: este contenedor es el unico que toca contenido externo no
+# confiable. Por diseno NO tiene credenciales de base de datos ni ruta de red
+# hacia el backend; su unico punto de contacto es el volumen /app/data/raw.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app/src
+
+WORKDIR /app
+
+COPY docker/requirements-scraper.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY src/ /app/src/
+
+# Usuario sin privilegios: si el contenedor se ve comprometido por contenido
+# .onion, no corre como root.
+RUN useradd --create-home --uid 1000 scraper \
+    && mkdir -p /app/data/raw \
+    && chown -R scraper:scraper /app
+USER scraper
+
+# Recolecta las URLs de SCRAPER_TARGET_URL vía Tor (fetcher.py): rotación de
+# circuitos, límites de tamaño y tiempo, redirecciones solo hacia .onion.
+# Ver SAFE_TESTING.md antes de apuntarlo a un objetivo real.
+CMD ["python", "/app/src/darkintel/scraper/fetcher.py"]

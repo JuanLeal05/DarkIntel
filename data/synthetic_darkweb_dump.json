@@ -1,0 +1,119 @@
+[
+  {
+    "post_id": "post_001",
+    "source_sim": "forum_sim_A",
+    "timestamp": "2025-11-15T03:42:00Z",
+    "lang": "en",
+    "text": "Fresh combo list 500k tested on Netflix and Spotify. C2 running at 198.51.100.42:4444. Use CVE-2024-1234 for initial access via phishing.",
+    "labels_manual": {
+      "ips": ["198.51.100.42"],
+      "hashes": [],
+      "cves": ["CVE-2024-1234"],
+      "dominios": []
+    }
+  },
+  {
+    "post_id": "post_002",
+    "source_sim": "forum_sim_A",
+    "timestamp": "2025-11-15T04:10:00Z",
+    "lang": "en",
+    "text": "Update on the credential campaign. New stealer deployed at 198.51.100.42. Secondary C2 at 203.0.113.17:8080. Exploiting CVE-2024-1234 still works on unpatched systems.",
+    "labels_manual": {
+      "ips": ["198.51.100.42", "203.0.113.17"],
+      "hashes": [],
+      "cves": ["CVE-2024-1234"],
+      "dominios": []
+    }
+  },
+  {
+    "post_id": "post_003",
+    "source_sim": "forum_sim_A",
+    "timestamp": "2025-11-15T05:00:00Z",
+    "lang": "en",
+    "text": "Combo list updated 800k accounts. C2 still 198.51.100.42. Drop me a message for access.",
+    "labels_manual": {
+      "ips": ["198.51.100.42"],
+      "hashes": [],
+      "cves": [],
+      "dominios": []
+    }
+  },
+  {
+    "post_id": "post_004",
+    "source_sim": "forum_sim_B",
+    "timestamp": "2025-11-16T01:15:00Z",
+    "lang": "en",
+    "text": "Ransomware LockBit variant ready. Payload SHA256 a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a. Drops to C:\\Windows\\Temp\\svchost32.exe. Targets healthcare sector.",
+    "labels_manual": {
+      "ips": [],
+      "hashes": ["a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"],
+      "cves": [],
+      "dominios": []
+    }
+  },
+  {
+    "post_id": "post_005",
+    "source_sim": "forum_sim_B",
+    "timestamp": "2025-11-16T02:00:00Z",
+    "lang": "en",
+    "text": "LockBit affiliate program open. Payment via ransom.darkpay.onion. New payload hash MD5 098f6bcd4621d373cade4e832627b4f6. Encryption key exchange active.",
+    "labels_manual": {
+      "ips": [],
+      "hashes": ["098f6bcd4621d373cade4e832627b4f6"],
+      "cves": [],
+      "dominios": ["ransom.darkpay.onion"]
+    }
+  },
+  {
+    "post_id": "post_006",
+    "source_sim": "forum_sim_B",
+    "timestamp": "2025-11-16T03:30:00Z",
+    "lang": "en",
+    "text": "Ransomware update: added wiper module. SHA256 b14a7b8059d9c055954c92674ce60032b0a52f8e000000000000000000000000. Targeting backup systems first. Contact at darkpay.onion for partnership.",
+    "labels_manual": {
+      "ips": [],
+      "hashes": ["b14a7b8059d9c055954c92674ce60032b0a52f8e000000000000000000000000"],
+      "cves": [],
+      "dominios": ["darkpay.onion"]
+    }
+  },
+  {
+    "post_id": "post_007",
+    "source_sim": "forum_sim_C",
+    "timestamp": "2025-11-17T00:05:00Z",
+    "lang": "en",
+    "text": "Selling zero-day for Apache CVE-2024-5678. Remote code execution, no auth required. PoC tested on versions 2.4.1 to 2.4.51. Price negotiable. Contact via exploit-market.onion.",
+    "labels_manual": {
+      "ips": [],
+      "hashes": [],
+      "cves": ["CVE-2024-5678"],
+      "dominios": ["exploit-market.onion"]
+    }
+  },
+  {
+    "post_id": "post_008",
+    "source_sim": "forum_sim_C",
+    "timestamp": "2025-11-17T01:20:00Z",
+    "lang": "en",
+    "text": "New exploit kit targeting CVE-2024-5678 and CVE-2024-9999. Dropper at 192.0.2.100:80. Kit hash SHA256 c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2.",
+    "labels_manual": {
+      "ips": ["192.0.2.100"],
+      "hashes": ["c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"],
+      "cves": ["CVE-2024-5678", "CVE-2024-9999"],
+      "dominios": []
+    }
+  },
+  {
+    "post_id": "post_009",
+    "source_sim": "forum_sim_C",
+    "timestamp": "2025-11-17T02:45:00Z",
+    "lang": "en",
+    "text": "Exploit for CVE-2024-9999 updated with sandbox evasion. Stage 2 payload hosted at exploit-market.onion/stage2.bin. Dropper MD5 5d41402abc4b2a76b9719d911017c592.",
+    "labels_manual": {
+      "ips": [],
+      "hashes": ["5d41402abc4b2a76b9719d911017c592"],
+      "cves": ["CVE-2024-9999"],
+      "dominios": ["exploit-market.onion"]
+    }
+  }
+]

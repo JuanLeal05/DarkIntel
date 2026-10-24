@@ -3,29 +3,34 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from darkintel.scraper.fetcher import obtener_html
-from darkintel.scraper.parser import crear_soup, extraer_titulo
-from darkintel.scraper.parser import extraer_libros
-
-def test_extraer_libros():
-    html = obtener_html("https://books.toscrape.com")
-    soup = crear_soup(html)
-    libros = extraer_libros(soup, "https://books.toscrape.com")
-
-    assert len(libros) == 20
-    assert all("titulo" in libro and "url" in libro for libro in libros)
-    assert libros[0]["url"].startswith("https://books.toscrape.com/")
-    print(f"✅ Prueba superada. Se extrajeron {len(libros)} libros correctamente.")
+from darkintel.scraper.parser import crear_soup, extraer_titulo, extraer_texto_pagina
 
 
 def test_extraer_titulo():
-    html = obtener_html("https://books.toscrape.com")
+    html = "<html><head><title>Foro Underground</title></head><body></body></html>"
     soup = crear_soup(html)
     titulo = extraer_titulo(soup)
+    assert titulo == "Foro Underground"
+    print("✅ test_extraer_titulo superado:", titulo)
 
-    assert titulo != ""
-    assert "Books" in titulo
-    print("✅ Prueba superada. Título extraído:", titulo)
+
+def test_extraer_texto_pagina():
+    html = """
+    <html><body>
+        <script>alert('ignorar')</script>
+        <style>body { color: red; }</style>
+        <p>IP sospechosa: 198.51.100.42</p>
+        <p>Hash: e3b0c44298fc1c149afbf4c8996fb924</p>
+    </body></html>
+    """
+    soup = crear_soup(html)
+    texto = extraer_texto_pagina(soup)
+    assert "198.51.100.42" in texto
+    assert "e3b0c44298fc1c149afbf4c8996fb924" in texto
+    assert "alert" not in texto
+    assert "color: red" not in texto
+    print("✅ test_extraer_texto_pagina superado")
+
 
 from darkintel.scraper.parser import extraer_enlaces
 
@@ -41,5 +46,4 @@ def test_extraer_enlaces():
 
 if __name__ == "__main__":
     test_extraer_titulo()
-    test_extraer_libros()
-    test_extraer_enlaces()
+    test_extraer_texto_pagina()
