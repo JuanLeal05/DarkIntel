@@ -1,0 +1,413 @@
+{
+  "split": "test",
+  "resultados": {
+    "base": {
+      "total": {
+        "malware": {
+          "precision": 0.1849,
+          "recall": 0.2493,
+          "f1": 0.2123,
+          "tp": 86,
+          "fp": 379,
+          "fn": 259
+        },
+        "herramienta": {
+          "precision": 0.0495,
+          "recall": 0.0741,
+          "f1": 0.0593,
+          "tp": 24,
+          "fp": 461,
+          "fn": 300
+        },
+        "actor": {
+          "precision": 0.819,
+          "recall": 0.6732,
+          "f1": 0.739,
+          "tp": 344,
+          "fp": 76,
+          "fn": 167
+        },
+        "tecnica": {
+          "precision": 0.5813,
+          "recall": 0.4109,
+          "f1": 0.4815,
+          "tp": 143,
+          "fp": 103,
+          "fn": 205
+        },
+        "total": {
+          "precision": 0.3694,
+          "recall": 0.3907,
+          "f1": 0.3798,
+          "tp": 597,
+          "fp": 1019,
+          "fn": 931
+        },
+        "deteccion": {
+          "precision": 0.5575,
+          "recall": 0.5897,
+          "f1": 0.5732,
+          "tp": 901,
+          "fp": 715,
+          "fn": 627
+        }
+      },
+      "por_fuente": {
+        "Attacker": {
+          "malware": {
+            "precision": 0.3393,
+            "recall": 0.3725,
+            "f1": 0.3551,
+            "tp": 19,
+            "fp": 37,
+            "fn": 32
+          },
+          "herramienta": {
+            "precision": 0.0615,
+            "recall": 0.2667,
+            "f1": 0.1,
+            "tp": 8,
+            "fp": 122,
+            "fn": 22
+          },
+          "actor": {
+            "precision": 0.3913,
+            "recall": 0.2338,
+            "f1": 0.2927,
+            "tp": 18,
+            "fp": 28,
+            "fn": 59
+          },
+          "tecnica": {
+            "precision": 0.0625,
+            "recall": 0.0253,
+            "f1": 0.036,
+            "tp": 2,
+            "fp": 30,
+            "fn": 77
+          },
+          "total": {
+            "precision": 0.178,
+            "recall": 0.1983,
+            "f1": 0.1876,
+            "tp": 47,
+            "fp": 217,
+            "fn": 190
+          },
+          "deteccion": {
+            "precision": 0.2841,
+            "recall": 0.3165,
+            "f1": 0.2994,
+            "tp": 75,
+            "fp": 189,
+            "fn": 162
+          }
+        },
+        "CyNER": {
+          "malware": {
+            "precision": 0.57,
+            "recall": 0.5,
+            "f1": 0.5327,
+            "tp": 57,
+            "fp": 43,
+            "fn": 57
+          },
+          "herramienta": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "tp": 0,
+            "fp": 172,
+            "fn": 0
+          },
+          "actor": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "tp": 0,
+            "fp": 18,
+            "fn": 0
+          },
+          "tecnica": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "tp": 0,
+            "fp": 16,
+            "fn": 0
+          },
+          "total": {
+            "precision": 0.1863,
+            "recall": 0.5,
+            "f1": 0.2714,
+            "tp": 57,
+            "fp": 249,
+            "fn": 57
+          },
+          "deteccion": {
+            "precision": 0.2549,
+            "recall": 0.6842,
+            "f1": 0.3714,
+            "tp": 78,
+            "fp": 228,
+            "fn": 36
+          }
+        },
+        "DNRTI": {
+          "malware": {
+            "precision": 0.0324,
+            "recall": 0.0556,
+            "f1": 0.0409,
+            "tp": 10,
+            "fp": 299,
+            "fn": 170
+          },
+          "herramienta": {
+            "precision": 0.0874,
+            "recall": 0.0544,
+            "f1": 0.0671,
+            "tp": 16,
+            "fp": 167,
+            "fn": 278
+          },
+          "actor": {
+            "precision": 0.9157,
+            "recall": 0.7512,
+            "f1": 0.8253,
+            "tp": 326,
+            "fp": 30,
+            "fn": 108
+          },
+          "tecnica": {
+            "precision": 0.7121,
+            "recall": 0.5242,
+            "f1": 0.6039,
+            "tp": 141,
+            "fp": 57,
+            "fn": 128
+          },
+          "total": {
+            "precision": 0.4713,
+            "recall": 0.4189,
+            "f1": 0.4435,
+            "tp": 493,
+            "fp": 553,
+            "fn": 684
+          },
+          "deteccion": {
+            "precision": 0.7151,
+            "recall": 0.6355,
+            "f1": 0.673,
+            "tp": 748,
+            "fp": 298,
+            "fn": 429
+          }
+        }
+      }
+    },
+    "modelos/darkintel-ner-v1": {
+      "total": {
+        "malware": {
+          "precision": 0.5453,
+          "recall": 0.7333,
+          "f1": 0.6255,
+          "tp": 253,
+          "fp": 211,
+          "fn": 92
+        },
+        "herramienta": {
+          "precision": 0.3366,
+          "recall": 0.429,
+          "f1": 0.3772,
+          "tp": 139,
+          "fp": 274,
+          "fn": 185
+        },
+        "actor": {
+          "precision": 0.8697,
+          "recall": 0.7965,
+          "f1": 0.8315,
+          "tp": 407,
+          "fp": 61,
+          "fn": 104
+        },
+        "tecnica": {
+          "precision": 0.6403,
+          "recall": 0.5575,
+          "f1": 0.596,
+          "tp": 194,
+          "fp": 109,
+          "fn": 154
+        },
+        "total": {
+          "precision": 0.6025,
+          "recall": 0.6499,
+          "f1": 0.6253,
+          "tp": 993,
+          "fp": 655,
+          "fn": 535
+        },
+        "deteccion": {
+          "precision": 0.6839,
+          "recall": 0.7376,
+          "f1": 0.7097,
+          "tp": 1127,
+          "fp": 521,
+          "fn": 401
+        }
+      },
+      "por_fuente": {
+        "Attacker": {
+          "malware": {
+            "precision": 0.5957,
+            "recall": 0.549,
+            "f1": 0.5714,
+            "tp": 28,
+            "fp": 19,
+            "fn": 23
+          },
+          "herramienta": {
+            "precision": 0.2222,
+            "recall": 0.5333,
+            "f1": 0.3137,
+            "tp": 16,
+            "fp": 56,
+            "fn": 14
+          },
+          "actor": {
+            "precision": 0.6667,
+            "recall": 0.5714,
+            "f1": 0.6154,
+            "tp": 44,
+            "fp": 22,
+            "fn": 33
+          },
+          "tecnica": {
+            "precision": 0.2317,
+            "recall": 0.2405,
+            "f1": 0.236,
+            "tp": 19,
+            "fp": 63,
+            "fn": 60
+          },
+          "total": {
+            "precision": 0.4007,
+            "recall": 0.4515,
+            "f1": 0.4246,
+            "tp": 107,
+            "fp": 160,
+            "fn": 130
+          },
+          "deteccion": {
+            "precision": 0.427,
+            "recall": 0.481,
+            "f1": 0.4524,
+            "tp": 114,
+            "fp": 153,
+            "fn": 123
+          }
+        },
+        "CyNER": {
+          "malware": {
+            "precision": 0.886,
+            "recall": 0.886,
+            "f1": 0.886,
+            "tp": 101,
+            "fp": 13,
+            "fn": 13
+          },
+          "herramienta": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "tp": 0,
+            "fp": 59,
+            "fn": 0
+          },
+          "actor": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "tp": 0,
+            "fp": 5,
+            "fn": 0
+          },
+          "tecnica": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "tp": 0,
+            "fp": 3,
+            "fn": 0
+          },
+          "total": {
+            "precision": 0.558,
+            "recall": 0.886,
+            "f1": 0.6847,
+            "tp": 101,
+            "fp": 80,
+            "fn": 13
+          },
+          "deteccion": {
+            "precision": 0.5691,
+            "recall": 0.9035,
+            "f1": 0.6983,
+            "tp": 103,
+            "fp": 78,
+            "fn": 11
+          }
+        },
+        "DNRTI": {
+          "malware": {
+            "precision": 0.4092,
+            "recall": 0.6889,
+            "f1": 0.5135,
+            "tp": 124,
+            "fp": 179,
+            "fn": 56
+          },
+          "herramienta": {
+            "precision": 0.4362,
+            "recall": 0.4184,
+            "f1": 0.4271,
+            "tp": 123,
+            "fp": 159,
+            "fn": 171
+          },
+          "actor": {
+            "precision": 0.9144,
+            "recall": 0.8364,
+            "f1": 0.8736,
+            "tp": 363,
+            "fp": 34,
+            "fn": 71
+          },
+          "tecnica": {
+            "precision": 0.8028,
+            "recall": 0.6506,
+            "f1": 0.7187,
+            "tp": 175,
+            "fp": 43,
+            "fn": 94
+          },
+          "total": {
+            "precision": 0.6542,
+            "recall": 0.6669,
+            "f1": 0.6605,
+            "tp": 785,
+            "fp": 415,
+            "fn": 392
+          },
+          "deteccion": {
+            "precision": 0.7583,
+            "recall": 0.7732,
+            "f1": 0.7657,
+            "tp": 910,
+            "fp": 290,
+            "fn": 267
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "fecha": "2026-10-24T01:43:35+00:00",
+  "modelo_base": "CyberPeace-Institute/SecureBERT-NER",
+  "revision_base": "7f935a4f7db13697580c881e381bb2636dfa779a",
+  "datos": "data\\cyberner\\resumen.json",
+  "hiperparametros": {
+    "epocas": 4,
+    "lr": 3e-05,
+    "batch": 16,
+    "max_tokens": 256,
+    "semilla": 42,
+    "bf16": true
+  },
+  "minutos_entrenamiento": 6.6,
+  "metricas_dev": {
+    "eval_loss": 0.18287800252437592,
+    "eval_f1": 0.6224,
+    "eval_precision": 0.6174,
+    "eval_recall": 0.6274,
+    "eval_f1_deteccion": 0.7324,
+    "eval_f1_malware": 0.6128,
+    "eval_f1_herramienta": 0.3977,
+    "eval_f1_actor": 0.8105,
+    "eval_f1_tecnica": 0.6003,
+    "eval_runtime": 1.2287,
+    "eval_samples_per_second": 1093.056,
+    "eval_steps_per_second": 34.183,
+    "epoch": 4.0
+  },
+  "etiquetas": [
+    "O",
+    "B-MAL",
+    "I-MAL",
+    "B-TOOL",
+    "I-TOOL",
+    "B-APT",
+    "I-APT",
+    "B-ACT",
+    "I-ACT"
+  ]
+}
