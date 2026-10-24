@@ -17,8 +17,8 @@ python -m pytest tests/test_fetcher.py -v
 
 Confirma que `obtener_html()` y sus defensas funcionan en aislamiento, con
 `requests.get` simulado: límite de tamaño, tiempo total máximo, redirecciones
-solo hacia `.onion`, validación de `socks5h://`, intervalo real de 10 s entre
-`NEWNYM` y reintentos solo ante fallos de red. Cero riesgo: no sale ni un paquete a la red. Correr esto primero
+solo hacia `.onion`, validación de `socks5h://`, rotación de circuitos por
+credencial SOCKS y reintentos solo ante fallos de red. Cero riesgo: no sale ni un paquete a la red. Correr esto primero
 siempre que toques `fetcher.py`.
 
 ---
@@ -59,8 +59,8 @@ y falla con `0x04 Host unreachable`. El objetivo tiene que ser la direccion
 `.onion` real.
 
 Qué validar:
-- El log del scraper debe mostrar `🔄 Circuito Tor renovado (NEWNYM)` —
-  confirma que `stem` se autenticó contra el `ControlPort` correctamente.
+- El log del scraper debe mostrar `🔄 Circuito Tor nuevo (aislamiento por
+  credencial SOCKS)` antes de cada objetivo.
 - El HTML devuelto debe contener el texto de prueba de
   `docker/test-onion/index.html` (incluye un IoC de prueba,
   `CVE-2024-9999`, que **no existe** — así se distingue de inmediato de
@@ -129,8 +129,8 @@ describe el paper sobre riesgo operativo:
   defensa, no la primera — la primera es el host.
 - Define `SCRAPER_TARGET_URL` en `.env`, nunca lo pegues directo en el
   código ni en un commit.
-- Sube `MaxCircuitDirtiness` o llama `renovar_circuito()` con más
-  frecuencia si vas a rastrear varios posts seguidos del mismo foro.
+- Llama `renovar_circuito()` con más frecuencia (cambia la credencial
+  SOCKS y con ella el circuito) si vas a rastrear varios posts seguidos del mismo foro.
 - Respeta lo que ya dice el paper: filtrado previo por hash conocido
   (PhotoDNA u homólogo) antes de persistir cualquier contenido, y
   descarte automático de lo que no pase ese filtro. Esto se implementa en

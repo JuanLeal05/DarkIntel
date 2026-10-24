@@ -15,9 +15,10 @@
 # del scraper se ve comprometido por contenido .onion, no tiene ruta de red
 # hacia la base de datos ni hacia internet sin pasar por Tor.
 #
-# Variables obligatorias (definirlas en .env): POSTGRES_PASSWORD y
-# TOR_CONTROL_PASSWORD. Sin ellas `docker compose` se niega a arrancar, a
-# proposito: nada de contraseñas por defecto conocidas.
+# Variable obligatoria (definirla en .env): POSTGRES_PASSWORD. Sin ella
+# `docker compose` se niega a arrancar, a proposito: nada de contraseñas por
+# defecto conocidas. Tor no tiene ControlPort, asi que no hay contraseña de
+# control que robar: los circuitos rotan por credenciales SOCKS aleatorias.
 
 name: darkintel
 
@@ -65,11 +66,6 @@ services:
     # tor_egress: para que Tor pueda salir a internet
     networks: [darknet, tor_egress]
     restart: unless-stopped
-    environment:
-      # El entrypoint genera el HashedControlPassword a partir de esta
-      # variable al arrancar (ver docker/tor-entrypoint.sh). El hash ya no
-      # vive en docker/torrc ni en el repositorio.
-      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:?Define TOR_CONTROL_PASSWORD en .env}
     healthcheck:
       # Verifica que el SOCKS5 realmente enruta trafico por Tor.
       test: ["CMD-SHELL", "curl -s --socks5-hostname localhost:9050 https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'"]
@@ -120,10 +116,9 @@ services:
     volumes:
       - raw_data:/app/data/raw   # unico canal hacia el backend
     environment:
+      # Sin usuario/contraseña: fetcher.py agrega una credencial aleatoria
+      # por objetivo para aislar circuitos.
       TOR_SOCKS_PROXY: socks5h://tor-proxy:9050
-      TOR_CONTROL_HOST: tor-proxy
-      TOR_CONTROL_PORT: 9051
-      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:?Define TOR_CONTROL_PASSWORD en .env}
       # Controla la etapa de prueba sin tocar código (ver SAFE_TESTING.md).
       # Sin valor por defecto a proposito: si no se define, fetcher.py sale
       # con un mensaje claro en vez de fallar contra un objetivo invalido.

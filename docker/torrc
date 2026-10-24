@@ -3,7 +3,10 @@
 # Escucha en todas las interfaces del contenedor para que `scraper` pueda
 # alcanzarlo como socks5h://tor-proxy:9050. El puerto no se publica al host,
 # asi que solo es accesible desde la red darknet.
-SocksPort 0.0.0.0:9050
+# IsolateSOCKSAuth (activo por defecto, declarado aqui a proposito): cada
+# usuario/contraseña SOCKS distinto usa su propio circuito. fetcher.py pone
+# una credencial aleatoria por objetivo y asi rota circuitos sin ControlPort.
+SocksPort 0.0.0.0:9050 IsolateSOCKSAuth
 
 # Solo se aceptan conexiones desde loopback (healthcheck dentro del propio
 # contenedor) y desde rangos privados de Docker (red darknet).
@@ -19,16 +22,7 @@ Log notice stdout
 # Rotacion de circuitos: tiempo de vida de un circuito antes de rotar.
 MaxCircuitDirtiness 60
 
-# ControlPort — necesario para la rotacion programatica de circuitos con Stem
-# (Python) desde el contenedor scraper. NO se publica al host (mismo criterio
-# que SocksPort): solo alcanzable dentro de la red darknet.
-#
-# El hash de abajo corresponde a la contraseña de ejemplo
-# "cambia_esta_password_de_control" — CAMBIARLA antes de cualquier uso real:
-#
-#   docker compose run --rm tor-proxy tor --hash-password "tu_password_aqui"
-#
-# y copiar la línea "16:XXXX..." que imprime. La contraseña en texto plano
-# (no el hash) va en la variable de entorno TOR_CONTROL_PASSWORD del
-# servicio `scraper` en docker-compose.yml / .env — nunca en este archivo.
-ControlPort 0.0.0.0:9051
+# SIN ControlPort, a proposito. Con su contraseña, un scraper comprometido
+# podria reconfigurar Tor (Tor no permite limitar los comandos de control).
+# La rotacion de circuitos se hace por aislamiento SOCKS (ver SocksPort).
+ControlPort 0

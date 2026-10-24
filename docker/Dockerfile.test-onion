@@ -2,7 +2,7 @@
 #
 # Hidden service Tor propio que sirve una página HTML inocua y controlada.
 # Sirve para la Etapa 1 de pruebas (ver SAFE_TESTING.md): validar que
-# fetcher.py + stem funcionan extremo a extremo SIN salir a la dark web
+# fetcher.py y la rotación de circuitos funcionan extremo a extremo SIN salir a la dark web
 # pública ni a internet. Todo el tráfico queda dentro del contenedor/host.
 FROM debian:bookworm-slim
 

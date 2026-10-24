@@ -164,28 +164,57 @@ def test_bloquea_esquema_no_http():
             assert "esquema" in str(e)
 
 
-# ── Rotacion de circuitos ────────────────────────────────────
+# ── Rotacion de circuitos (aislamiento por credencial SOCKS) ─
 
-def test_newnym_respeta_intervalo_de_10s_entre_llamadas():
-    """
-    Dos renovaciones seguidas: la segunda debe esperar ~10 s aunque cada
-    llamada abra un Controller nuevo (stem no recuerda entre instancias).
-    """
+def test_proxies_lleva_credencial_de_aislamiento():
+    from urllib.parse import urlparse
+    with _con_proxy_tor():
+        proxies = _proxies()
+    url = urlparse(proxies["https"])
+    assert proxies["http"] == proxies["https"]
+    assert url.scheme == "socks5h"
+    assert (url.hostname, url.port) == ("tor-proxy", 9050)
+    assert url.username and len(url.username) == 32   # 128 bits aleatorios
+
+
+def test_renovar_circuito_cambia_la_credencial():
     import darkintel.scraper.fetcher as fetcher_mod
-
-    esperas = []
-    with patch.object(fetcher_mod, "_STEM_DISPONIBLE", True), \
-         patch.object(fetcher_mod, "TOR_CONTROL_PASSWORD", "x"), \
-         patch.object(fetcher_mod, "_ultimo_newnym", float("-inf")), \
-         patch.object(fetcher_mod, "Controller", MagicMock(), create=True), \
-         patch.object(fetcher_mod, "Signal", MagicMock(), create=True), \
-         patch("darkintel.scraper.fetcher.socket.gethostbyname", return_value="127.0.0.1"), \
-         patch("darkintel.scraper.fetcher.time.sleep", side_effect=esperas.append):
+    with _con_proxy_tor():
+        antes = _proxies()["https"]
         assert fetcher_mod.renovar_circuito() is True
+        despues = _proxies()["https"]
         assert fetcher_mod.renovar_circuito() is True
+        otra = _proxies()["https"]
+    assert len({antes, despues, otra}) == 3   # circuito distinto cada vez
 
-    assert len(esperas) == 1                 # la primera no espera
-    assert 9 < esperas[0] <= 10              # la segunda espera ~10 s
+
+def test_redirecciones_comparten_circuito():
+    redir = _mock_redireccion("/post?page=2")
+    final = _mock_respuesta([b"<html>ok</html>"])
+    final.status_code = 200
+    with _con_proxy_tor(), patch(
+        "darkintel.scraper.fetcher.requests.get", side_effect=[redir, final]
+    ) as mock_get:
+        obtener_html("http://foro.onion/post", usar_tor=True)
+    p1 = mock_get.call_args_list[0].kwargs["proxies"]
+    p2 = mock_get.call_args_list[1].kwargs["proxies"]
+    assert p1 == p2
+
+
+def test_proxies_rechaza_credenciales_en_la_variable():
+    import darkintel.scraper.fetcher as fetcher_mod
+    with patch.object(fetcher_mod, "TOR_SOCKS_PROXY", "socks5h://u:p@tor-proxy:9050"):
+        try:
+            _proxies()
+            assert False, "Deberia rechazar usuario/contraseña en TOR_SOCKS_PROXY"
+        except RuntimeError as e:
+            assert "aislamiento" in str(e)
+
+
+def test_no_quedan_rastros_del_controlport():
+    import darkintel.scraper.fetcher as fetcher_mod
+    for nombre in ("TOR_CONTROL_PASSWORD", "TOR_CONTROL_HOST", "Controller"):
+        assert not hasattr(fetcher_mod, nombre), nombre
 
 
 # ── Reintentos ante fallos de red ────────────────────────────

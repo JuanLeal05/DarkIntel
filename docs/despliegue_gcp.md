@@ -236,9 +236,8 @@ git clone -b main git@github.com:JuanLeal05/DarkIntel.git darkintel
 cd ~/darkintel
 cp .env.example .env
 chmod 600 .env
-# Generar contraseñas aleatorias:
+# Generar la contraseña aleatoria (Tor ya no usa contraseña de control):
 sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
-sed -i "s/^TOR_CONTROL_PASSWORD=.*/TOR_CONTROL_PASSWORD=$(openssl rand -hex 24)/" .env
 grep -c "=$" .env   # cuántas variables siguen vacías (SCRAPER_TARGET_URL puede quedar vacía)
 ```
 
@@ -311,6 +310,10 @@ docker compose run --rm --no-deps --entrypoint python scraper -c \
 # 4. Ningún contenedor llega al servidor de metadatos (debe FALLAR, código 28 o 7)
 docker compose exec tor-proxy curl -s -m 5 -H "Metadata-Flavor: Google" \
   http://169.254.169.254/computeMetadata/v1/ ; echo "codigo de salida: $?"
+
+# 4b. Tor no tiene ControlPort (debe FALLAR con ConnectionRefusedError)
+docker compose run --rm --no-deps --entrypoint python scraper -c \
+  "import socket; socket.create_connection(('tor-proxy', 9051), 5)"
 
 # 5. Pipeline completo con el hidden service propio (Etapa 1 de SAFE_TESTING.md)
 docker compose --profile testing up -d test-onion
@@ -468,18 +471,16 @@ el túnel de 0.11 desde el portátil.
 | Revisar IAM y la alerta de presupuesto cada semana | Detecta accesos que sobran o uso anómalo |
 | Apagar la VM al terminar | Evita costes sorpresa y reduce el tiempo expuesto |
 
-### Riesgo conocido: el ControlPort de Tor
+### Tor sin ControlPort
 
-El scraper conoce `TOR_CONTROL_PASSWORD` para pedir `NEWNYM`. Con esa
-contraseña, quien controle el contenedor del scraper (por ejemplo, un
-`.onion` que explote una falla en el parser) puede **reconfigurar Tor**
-mediante el ControlPort: Tor no permite limitar qué comandos acepta. En esta
-VM el daño queda acotado, porque no tiene IP pública ni puertos de entrada,
-pero la solución de fondo es **quitar el ControlPort**: Tor ya aísla los
-circuitos por usuario/contraseña SOCKS (`IsolateSOCKSAuth`, activo por
-defecto), así que usar credenciales SOCKS aleatorias por objetivo
-(`socks5h://<aleatorio>:<aleatorio>@tor-proxy:9050`) da un circuito nuevo
-sin necesidad de `stem` ni de contraseña de control.
+Tor no permite limitar qué comandos acepta su ControlPort: con la contraseña
+de control, quien comprometiera el scraper (por ejemplo, un `.onion` que
+explote una falla en el parser) podría reconfigurar Tor. Por eso el
+`tor-proxy` corre **sin ControlPort** (`ControlPort 0`), y la rotación de
+circuitos se hace con credenciales SOCKS aleatorias por objetivo: Tor
+(`IsolateSOCKSAuth`) asigna un circuito propio a cada credencial. No hay
+contraseña de control en el `.env` ni en ningún contenedor. La prueba 4b de
+0.10 confirma que el puerto 9051 está cerrado.
 
 ### Restaurar desde un snapshot
 

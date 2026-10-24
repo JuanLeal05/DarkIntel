@@ -1,17 +1,10 @@
 import os
-import socket
+import secrets
 import time
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 import requests
-
-try:
-    from stem import Signal
-    from stem.control import Controller
-    _STEM_DISPONIBLE = True
-except ImportError:
-    _STEM_DISPONIBLE = False
 
 from darkintel.scraper.parser import crear_soup, extraer_texto_pagina, extraer_titulo
 from darkintel.scraper.storage import guardar_json
@@ -19,9 +12,6 @@ from darkintel.scraper.storage import guardar_json
 
 # ── Configuración vía entorno (inyectada por docker-compose) ───────────
 TOR_SOCKS_PROXY = os.environ.get("TOR_SOCKS_PROXY", "")          # socks5h://tor-proxy:9050
-TOR_CONTROL_HOST = os.environ.get("TOR_CONTROL_HOST", "tor-proxy")
-TOR_CONTROL_PORT = int(os.environ.get("TOR_CONTROL_PORT", "9051"))
-TOR_CONTROL_PASSWORD = os.environ.get("TOR_CONTROL_PASSWORD", "")
 
 # Los .onion son lentos: nada de timeout=10 aquí.
 TIMEOUT_TOR = 90
@@ -44,11 +34,33 @@ CODIGOS_REDIRECCION = (301, 302, 303, 307, 308)
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/128.0"
 
 
+# ── Aislamiento de circuitos por credenciales SOCKS ────────────────────
+# Tor asigna circuitos distintos a conexiones SOCKS con distinto usuario/
+# contraseña (IsolateSOCKSAuth, activo por defecto y declarado en
+# docker/torrc). Cambiar la credencial equivale a pedir un circuito nuevo,
+# sin ControlPort, sin stem y sin contraseña de control: un scraper
+# comprometido ya no tiene con que reconfigurar Tor. La credencial no es un
+# secreto: Tor acepta cualquiera y solo la usa como etiqueta de aislamiento.
+_credencial_socks = secrets.token_hex(16)
+
+
+def renovar_circuito() -> bool:
+    """
+    Genera una credencial SOCKS aleatoria nueva: las siguientes peticiones
+    viajan por un circuito Tor distinto. Las redirecciones de una misma
+    descarga comparten credencial, y por tanto circuito.
+    """
+    global _credencial_socks
+    _credencial_socks = secrets.token_hex(16)
+    return True
+
+
 def _proxies() -> dict:
     """
     Arma el diccionario de proxies para requests. Usa socks5h (con 'h') y NO
     socks5: la 'h' hace que la resolución DNS ocurra DENTRO del proxy Tor,
     que es justo lo que permite resolver .onion y evita fugas de DNS locales.
+    Inserta la credencial de aislamiento actual (ver renovar_circuito).
     """
     if not TOR_SOCKS_PROXY:
         raise RuntimeError(
@@ -61,47 +73,18 @@ def _proxies() -> dict:
             f"{TOR_SOCKS_PROXY!r}). socks5:// simple resuelve DNS en local "
             f"y filtra qué dominios .onion estás visitando."
         )
-    return {"http": TOR_SOCKS_PROXY, "https": TOR_SOCKS_PROXY}
-
-
-# Tor ignora (aplaza) un NEWNYM si llega antes de 10 s desde el anterior.
-INTERVALO_NEWNYM = 10
-_ultimo_newnym = float("-inf")   # instante (monotonic) del ultimo NEWNYM enviado
-
-
-def renovar_circuito() -> bool:
-    """
-    Pide a Tor un circuito nuevo (NEWNYM) vía el ControlPort usando stem.
-    Requiere ControlPort + HashedControlPassword configurados en torrc.
-    Devuelve False silenciosamente si stem o la contraseña no están
-    disponibles, para que el scraper siga funcionando sin rotación si hace
-    falta (mejor degradar que caerse).
-    """
-    if not _STEM_DISPONIBLE:
-        return False
-    if not TOR_CONTROL_PASSWORD:
-        return False
-    try:
-        # stem exige una IP literal: Controller.from_port falla con
-        # "Invalid IP address: tor-proxy" si se le pasa el nombre DNS del
-        # servicio Docker. Hay que resolverlo antes.
-        direccion = socket.gethostbyname(TOR_CONTROL_HOST)
-        with Controller.from_port(address=direccion, port=TOR_CONTROL_PORT) as controlador:
-            controlador.authenticate(password=TOR_CONTROL_PASSWORD)
-            # Tor solo respeta un NEWNYM cada 10 s. OJO: stem tiene
-            # get_newnym_wait(), pero solo recuerda los NEWNYM enviados por
-            # ESE objeto Controller, y aqui se abre uno nuevo en cada llamada,
-            # asi que siempre devolveria 0. Por eso el registro es global.
-            global _ultimo_newnym
-            espera = INTERVALO_NEWNYM - (time.monotonic() - _ultimo_newnym)
-            if espera > 0:
-                time.sleep(espera)
-            controlador.signal(Signal.NEWNYM)
-            _ultimo_newnym = time.monotonic()
-        return True
-    except Exception as error:
-        print(f"⚠️  No se pudo renovar el circuito Tor: {error}")
-        return False
+    base = urlparse(TOR_SOCKS_PROXY)
+    if base.username or base.password:
+        raise RuntimeError(
+            "TOR_SOCKS_PROXY no debe llevar usuario/contraseña: fetcher.py "
+            "pone su propia credencial de aislamiento por objetivo."
+        )
+    if not base.hostname or not base.port:
+        raise RuntimeError(
+            f"TOR_SOCKS_PROXY debe tener host y puerto (recibido: {TOR_SOCKS_PROXY!r})."
+        )
+    proxy = f"socks5h://{_credencial_socks}:{_credencial_socks}@{base.hostname}:{base.port}"
+    return {"http": proxy, "https": proxy}
 
 
 def _es_onion(url: str) -> bool:
@@ -245,7 +228,7 @@ if __name__ == "__main__":
         # Circuito nuevo por cada objetivo: evita que todas las peticiones
         # salgan por la misma ruta.
         if renovar_circuito():
-            print("   🔄 Circuito Tor renovado (NEWNYM)")
+            print("   🔄 Circuito Tor nuevo (aislamiento por credencial SOCKS)")
 
         try:
             html = obtener_html_con_reintentos(url)

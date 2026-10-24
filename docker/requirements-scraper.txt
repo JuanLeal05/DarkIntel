@@ -10,4 +10,3 @@ requests[socks]==2.34.2
 soupsieve==2.9.2
 urllib3==2.8.0
 PySocks==1.7.1      # backend SOCKS5 para requests (socks5h://)
-stem>=1.8.2          # control de circuitos Tor via ControlPort (NEWNYM)

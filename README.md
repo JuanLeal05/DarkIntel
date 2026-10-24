@@ -36,7 +36,7 @@ Todo corre en Docker con aislamiento de red en cuatro redes (el scraper no
 tiene salida directa a internet: solo a través de Tor).
 
 ```bash
-cp .env.example .env          # definir POSTGRES_PASSWORD y TOR_CONTROL_PASSWORD
+cp .env.example .env          # definir POSTGRES_PASSWORD
 docker compose build
 docker compose up -d api      # ejecuta el pipeline sobre el dataset sintético y levanta la API
 ```

@@ -19,7 +19,7 @@ un objetivo real, sigue el orden de pruebas de [SAFE_TESTING.md](SAFE_TESTING.md
           │  darknet  (internal: true)          │
           │                                     │
           │   scraper ── socks5h :9050 ──► tor-proxy
-          │           ── control  :9051 ──►     │
+          │   (sin ControlPort)                 │
           └─────┬───────────────────────────────┘
                 │ escribe (rw)
                 ▼
@@ -50,7 +50,7 @@ un objetivo real, sigue el orden de pruebas de [SAFE_TESTING.md](SAFE_TESTING.md
 | `scraper` solo en `darknet`, que es `internal: true` | El scraper **no tiene salida directa a internet**: su único camino hacia afuera es el SOCKS de Tor. Si un bug o un contenedor comprometido intenta salir sin Tor, no hay ruta (*fail-closed*): la IP real del host no puede filtrarse. |
 | Solo `tor-proxy` y `test-onion` en `tor_egress` | Son los únicos procesos que necesitan internet: el daemon Tor para construir circuitos y el hidden service de prueba para publicar su descriptor. |
 | `socks5h://` obligatorio | La "h" hace que el DNS se resuelva dentro de Tor: permite resolver `.onion` y evita fugas de DNS. `fetcher.py` rechaza cualquier otro esquema. |
-| Hash del ControlPort generado al arrancar | `docker/tor-entrypoint.sh` calcula `HashedControlPassword` desde `TOR_CONTROL_PASSWORD`. No hay hashes ni contraseñas por defecto en el repositorio. |
+| Tor **sin ControlPort** | Con la contraseña de control, un scraper comprometido podría reconfigurar Tor (Tor no permite limitar esos comandos). Los circuitos rotan por credenciales SOCKS aleatorias (`IsolateSOCKSAuth`), así que no hay contraseña de control que robar. |
 | `scraper` sin credenciales de BD ni ruta a `backend` | Si se ve comprometido por contenido `.onion`, no alcanza la base de datos. |
 | `raw_data` montado `:ro` en `processor` | Flujo unidireccional: darknet → backend, nunca al revés. |
 | `data/raw` validado como frontera de confianza | `data_loader.py` ignora symlinks, mide el tamaño antes de leer, valida cada post con un esquema estricto, descarta campos desconocidos y fuerza `labels_manual = None` (un scraper comprometido no puede falsear las métricas). |
@@ -72,9 +72,8 @@ Edita `.env` y define **obligatoriamente**:
 | Variable | Para qué |
 |---|---|
 | `POSTGRES_PASSWORD` | Contraseña de la base de datos |
-| `TOR_CONTROL_PASSWORD` | Contraseña del ControlPort de Tor (rotación de circuitos con `stem`) |
 
-Si alguna está vacía o falta, `docker compose` **se niega a arrancar**, a
+Si está vacía o falta, `docker compose` **se niega a arrancar**, a
 propósito. `POSTGRES_PASSWORD` solo se aplica al crear la base: para
 cambiarla después hay que recrear el volumen (`docker compose down -v`).
 
@@ -176,7 +175,7 @@ reconstruir la imagen afectada:
 | `src/darkintel/scraper/` | `docker compose build scraper` |
 | `src/darkintel/clustering/`, `stix_builder/`, `data_loader.py`, `pipeline/` | `docker compose build processor` |
 | `api/` | `docker compose build api` |
-| `docker/torrc`, `Dockerfile.tor`, `tor-entrypoint.sh` | `docker compose build tor-proxy` |
+| `docker/torrc`, `Dockerfile.tor` | `docker compose build tor-proxy` |
 
 ## Verificar el aislamiento (útil para la demo)
 
@@ -190,16 +189,19 @@ docker compose run --rm --entrypoint python scraper -c "import socket; socket.cr
 # 3. Tor sí enruta (debe devolver "IsTor":true):
 docker compose exec tor-proxy curl -s --socks5-hostname localhost:9050 https://check.torproject.org/api/ip
 
-# 4. Sin contraseñas, el stack no arranca (debe FALLAR con un mensaje claro):
-#    comentar TOR_CONTROL_PASSWORD en .env y ejecutar:
-docker compose up -d tor-proxy
+# 4. Tor no tiene ControlPort (debe FALLAR con ConnectionRefusedError):
+docker compose run --rm --entrypoint python scraper -c "import socket; socket.create_connection(('tor-proxy', 9051), 3)"
+
+# 5. Sin contraseña de la BD, el stack no arranca (debe FALLAR con un mensaje claro):
+#    comentar POSTGRES_PASSWORD en .env y ejecutar:
+docker compose up -d db
 ```
 
 ## Comportamiento del scraper
 
 | Mecanismo | Detalle |
 |---|---|
-| Rotación de circuitos | `NEWNYM` vía `stem` antes de cada objetivo, con un mínimo real de 10 s entre señales (límite de Tor). |
+| Rotación de circuitos | Credencial SOCKS aleatoria (128 bits) por objetivo y por reintento: Tor (`IsolateSOCKSAuth`) le asigna un circuito propio. Las redirecciones de una misma descarga comparten circuito. Sin ControlPort ni `stem`. |
 | Tamaño máximo | 5 MB por respuesta; si se supera, se descarta. |
 | Tiempo máximo | 90 s por operación de red y **120 s totales** por descarga (protege contra servidores que envían datos muy despacio a propósito). |
 | Redirecciones | Seguidas a mano: máximo 3, solo hacia `.onion` y solo `http`/`https`. |
@@ -209,7 +211,7 @@ docker compose up -d tor-proxy
 
 | Servicio | Estado |
 |---|---|
-| `tor-proxy` | Funcional. SOCKS5 y ControlPort autenticado, hash generado al arrancar. |
+| `tor-proxy` | Funcional. Solo SOCKS5 con aislamiento por credencial; sin ControlPort. |
 | `scraper` | Funcional vía Tor con las protecciones de la tabla anterior. Recolecta las URLs de `SCRAPER_TARGET_URL`; todavía no descubre enlaces por sí mismo (no hay crawling). |
 | `test-onion` | Hidden service propio para pruebas (perfil `testing`). |
 | `processor` | Funcional: valida `data/raw`, NER híbrido (regex + SecureBERT-NER + base de conocimiento), campañas por significado e infraestructura compartida, y bundles STIX 2.1 con malware, herramientas, actores y técnicas. Usa `data/raw` si tiene posts; si no, el dataset sintético. |

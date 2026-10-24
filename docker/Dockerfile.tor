@@ -1,9 +1,8 @@
 # DarkIntel — proxy Tor (redes: darknet + tor_egress)
 #
 # Daemon Tor en modo SOLO CLIENTE (sin relay ni nodo de salida). Expone
-# SOCKS5 (:9050) y ControlPort (:9051) únicamente dentro de la red darknet.
-# El HashedControlPassword se genera al arrancar a partir de
-# TOR_CONTROL_PASSWORD (docker/tor-entrypoint.sh): no hay hashes en el repo.
+# únicamente SOCKS5 (:9050) dentro de la red darknet. Sin ControlPort: la
+# rotación de circuitos se hace por credenciales SOCKS (IsolateSOCKSAuth).
 FROM debian:bookworm-slim
 
 RUN apt-get update \
@@ -11,11 +10,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/torrc /etc/tor/torrc
-COPY docker/tor-entrypoint.sh /usr/local/bin/tor-entrypoint.sh
-# Windows guarda los archivos con CRLF; un script con \r no arranca en Linux.
-RUN sed -i 's/\r$//' /usr/local/bin/tor-entrypoint.sh \
-    && chmod 755 /usr/local/bin/tor-entrypoint.sh
 
 EXPOSE 9050
 USER debian-tor
-CMD ["/usr/local/bin/tor-entrypoint.sh"]
+CMD ["tor", "-f", "/etc/tor/torrc"]
