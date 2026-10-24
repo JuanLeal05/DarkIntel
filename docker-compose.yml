@@ -150,6 +150,9 @@ services:
       - output_data:/app/data/output
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-darkintel}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/${POSTGRES_DB:-darkintel}
+      # Modelo NER: el de HuggingFace (por defecto) o uno ajustado copiado en
+      # modelos/ (ver entrenamiento/README.md), p. ej. /app/modelos/darkintel-ner-v1
+      DARKINTEL_NER_MODEL: ${DARKINTEL_NER_MODEL:-CyberPeace-Institute/SecureBERT-NER}
     depends_on:
       db:
         condition: service_healthy

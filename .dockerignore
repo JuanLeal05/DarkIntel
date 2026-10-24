@@ -21,3 +21,5 @@ docs/
 tests/
 README.md
 *.patch
+modelos/**/_checkpoints/
+modelos/*.json

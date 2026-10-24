@@ -25,6 +25,8 @@ from functools import lru_cache
 
 # ── Configuración ───────────────────────────────────────────
 
+# Puede ser un modelo de HuggingFace o una CARPETA local, p. ej. el modelo
+# ajustado con entrenamiento/entrenar_ner.py (modelos/darkintel-ner-v1).
 MODELO_NER = os.environ.get("DARKINTEL_NER_MODEL", "CyberPeace-Institute/SecureBERT-NER")
 # Commit fijo del modelo: reproducibilidad y protección de la cadena de
 # suministro (si alguien cambia el modelo en HuggingFace, no nos afecta).
@@ -73,7 +75,8 @@ def _cargar_pipeline():
     return pipeline(
         "token-classification",
         model=MODELO_NER,
-        revision=REVISION_NER,
+        # La revisión fija solo aplica a modelos de HuggingFace, no a carpetas
+        revision=None if os.path.isdir(MODELO_NER) else REVISION_NER,
         # "first": une los sub-tokens de una palabra y usa la etiqueta del
         # primero. Evita fragmentos tipo "Lock" + "Bit".
         aggregation_strategy="first",

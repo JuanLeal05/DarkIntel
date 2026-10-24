@@ -24,3 +24,9 @@ data/output/
 data/raw/
 
 .venv-gpu/
+
+# Fine-tuning: datos derivados de CyberNER (sin licencia de redistribucion)
+# y modelos entrenados (pesan ~500 MB). Solo se versiona el README.
+data/cyberner/
+modelos/*
+!modelos/README.md

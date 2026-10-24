@@ -46,6 +46,9 @@ COPY src/ /app/src/
 COPY pipeline/ /app/pipeline/
 COPY data/synthetic_darkweb_dump.json /app/data/synthetic_darkweb_dump.json
 COPY docker/run_pipeline.sh /app/run_pipeline.sh
+# Modelos NER ajustados localmente (entrenamiento/). La carpeta existe siempre
+# en el repo (con su README), así que este COPY no falla aunque esté vacía.
+COPY modelos/ /app/modelos/
 
 RUN useradd --create-home --uid 1000 processor \
     && chmod +x /app/run_pipeline.sh \

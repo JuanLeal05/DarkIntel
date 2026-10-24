@@ -1,0 +1,7 @@
+# Entorno de entrenamiento con GPU (.venv-gpu). PyTorch con CUDA se instala
+# ANTES y por separado (la RTX 5070, arquitectura Blackwell, necesita CUDA 12.8):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+#   pip install -r entrenamiento/requirements-gpu.txt
+transformers>=4.46,<6.0
+accelerate>=1.0
+numpy>=1.26,<3.0
